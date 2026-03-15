@@ -19,11 +19,11 @@ void eval_exp(int* value, int get_token_)
 {
 	if (get_token_)
 		get_token();
-	if (!*token) {
+	if (!*G_TOKEN_BUFFER) {
 		sntx_err(NO_EXP);
 		return;
 	}
-	if (*token == ';') {
+	if (*G_TOKEN_BUFFER == ';') {
 		*value = 0; /* ïóñòîå âûðàæåíèå (îïåðàòîð) */
 		return;
 	}
@@ -35,30 +35,30 @@ void eval_exp(int* value, int get_token_)
 /* Îáðàáîòêà ïðèñâàèâàíèÿ */
 void eval_exp0(int* value)
 {
-	char temp[ID_LEN];  /* holds name of var receiving
+	char temp[SETTINGS_ID_LEN];  /* holds name of var receiving
 						   the assignment */
 	char temp_tok;
 
-	if (token_type == IDENTIFIER) {
+	if (G_CURRENT_TOKEN_TYPE == IDENTIFIER) {
 
-		char name[ID_LEN + 1];
-		char size[ID_LEN + 1];
+		char name[SETTINGS_ID_LEN + 1];
+		char size[SETTINGS_ID_LEN + 1];
 		char* pos;
-		char token_temp[ID_LEN + 1];
-		my_strcpy_s(token_temp, ID_LEN, token);
+		char token_temp[SETTINGS_ID_LEN + 1];
+		my_strcpy_s(token_temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
 		if (pos = strchr(token_temp, '['))
 			extract_array_name_index(name, size, token_temp, pos);
-		if (is_var(token) || ::is_array(name)) {  /* if a var, see if assignment */
-			my_strcpy_s(temp, ID_LEN, token);
+		if (is_var(G_TOKEN_BUFFER) || ::is_array(name)) {  /* if a var, see if assignment */
+			my_strcpy_s(temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
 			/*
 			if (is_var(token))
 				my_strcpy_s(temp, ID_LEN, token);
 			else
 				my_strcpy_s(temp, ID_LEN, name);
 				*/
-			temp_tok = token_type;
+			temp_tok = G_CURRENT_TOKEN_TYPE;
 			get_token();
-			if (*token == '=') {  /* is an assignment */
+			if (*G_TOKEN_BUFFER == '=') {  /* is an assignment */
 				not_rekurs_eval_exp0_sim = 0;
 				get_token();
 				eval_exp0(value);  /* get value to assign */
@@ -71,8 +71,8 @@ void eval_exp0(int* value)
 			}
 			else {  /* not an assignment */
 				putback();  /* restore original token */
-				my_strcpy_s(token, 80, temp);
-				token_type = temp_tok;
+				my_strcpy_s(G_TOKEN_BUFFER, 80, temp);
+				G_CURRENT_TOKEN_TYPE = temp_tok;
 			}
 		}
 	}
@@ -89,7 +89,7 @@ void eval_exp1(int* value)
 	};
 
 	eval_exp2(value);
-	op = *token;
+	op = *G_TOKEN_BUFFER;
 	if (strchr(relops, op)) {
 		get_token();
 		eval_exp2(&partial_value);
@@ -123,7 +123,7 @@ void eval_exp2(int* value)
 	int partial_value;
 
 	eval_exp3(value);
-	while ((op = *token) == '+' || op == '-') {
+	while ((op = *G_TOKEN_BUFFER) == '+' || op == '-') {
 		get_token();
 		eval_exp3(&partial_value);
 		switch (op) { /* add or subtract */
@@ -144,7 +144,7 @@ void eval_exp3(int* value)
 	int partial_value, t;
 
 	eval_exp4(value);
-	while ((op = *token) == '*' || op == '/' || op == '%') {
+	while ((op = *G_TOKEN_BUFFER) == '*' || op == '/' || op == '%') {
 		get_token();
 		eval_exp4(&partial_value);
 		switch (op) { /* mul, div, or modulus */
@@ -169,8 +169,8 @@ void eval_exp4(int* value)
 	char  op;
 
 	op = '\0';
-	if (*token == '+' || *token == '-') {
-		op = *token;
+	if (*G_TOKEN_BUFFER == '+' || *G_TOKEN_BUFFER == '-') {
+		op = *G_TOKEN_BUFFER;
 		get_token();
 	}
 	eval_exp5(value);
@@ -181,10 +181,10 @@ void eval_exp4(int* value)
 /* Îáðàáîòêà âûðàæåíèé â ñêîáêàõ. */
 void eval_exp5(int* value)
 {
-	if (*token == '(') {
+	if (*G_TOKEN_BUFFER == '(') {
 		get_token();
 		eval_exp0(value);   /* get subexpression */
-		if (*token != ')') sntx_err(PAREN_EXPECTED);
+		if (*G_TOKEN_BUFFER != ')') sntx_err(PAREN_EXPECTED);
 		get_token();
 	}
 	else
@@ -195,47 +195,47 @@ void eval_exp5(int* value)
 void atom(int* value)
 {
 	int i;
-	char name[ID_LEN + 1];
-	char size[ID_LEN + 1];
-	char token_temp[ID_LEN + 1];
+	char name[SETTINGS_ID_LEN + 1];
+	char size[SETTINGS_ID_LEN + 1];
+	char token_temp[SETTINGS_ID_LEN + 1];
 
-	switch (token_type) {
+	switch (G_CURRENT_TOKEN_TYPE) {
 	case IDENTIFIER:
-		i = internal_func(token);
+		i = internal_func(G_TOKEN_BUFFER);
 		if (i != -1) {  /* call "standard library" function */
 			*value = (*intern_func[i].p)();
 		}
-		else if (find_func(token)) { /* call user-defined function */
+		else if (find_func(G_TOKEN_BUFFER)) { /* call user-defined function */
 			call();
 			*value = ret_value;
 		}
 		else
 		{
 			char* pos;
-			my_strcpy_s(token_temp, ID_LEN, token);
+			my_strcpy_s(token_temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
 			if (pos = strchr(token_temp, '['))
 				extract_array_name_index(name, size, token_temp, pos);
-			if (is_var(token))
-				*value = find_var_array(token, 0, 0);
+			if (is_var(G_TOKEN_BUFFER))
+				*value = find_var_array(G_TOKEN_BUFFER, 0, 0);
 			else
 				*value = find_var_array(name, 1, size);
 		}
 		get_token();
 		return;
 	case NUMBER: /* is numeric constant */
-		*value = atoi(token);
+		*value = atoi(G_TOKEN_BUFFER);
 		get_token();
 		return;
 	case DELIMITER: /* see if character constant */
-		if (*token == '\'') {
-			*value = *prog;
-			prog++;
-			if (*prog != '\'') sntx_err(QUOTE_EXPECTED);
-			prog++;
+		if (*G_TOKEN_BUFFER == '\'') {
+			*value = *G_PROGRAM_POINTER;
+			G_PROGRAM_POINTER++;
+			if (*G_PROGRAM_POINTER != '\'') sntx_err(QUOTE_EXPECTED);
+			G_PROGRAM_POINTER++;
 			get_token();
 			return;
 		}
-		if (*token == ')') return; /* process empty expression */
+		if (*G_TOKEN_BUFFER == ')') return; /* process empty expression */
 		else sntx_err(SYNTAX); /* syntax error */
 	default:
 		sntx_err(SYNTAX); /* syntax error */
@@ -255,11 +255,11 @@ int internal_func(char* s)
 	}
 	return -1;
 }
- 
 
 
 
-// ÈÇÌÅÍÈË - ÄÎÐÀÁÎÒÀÒÜ - VALUE ÒÎËÜÊÎ INT 
+
+// ÈÇÌÅÍÈË - ÄÎÐÀÁÎÒÀÒÜ - VALUE ÒÎËÜÊÎ INT
 void assign_var_array(char* var_name, int value, int is_array, char* array_index)
 {
 	if (!is_array)
@@ -281,20 +281,20 @@ int find_array(char* name, char* index)
 	for (i = larraytos - 1; i >= call_stack[functos - 1].arrays; i--) {
 		if (!strcmp(local_array_stack[i].array_name, name)) {
 			int index_value, token_type_temp;
-			char temp[ID_LEN + 1];
-			my_strcpy_s(temp, ID_LEN, token);
-			my_strcpy_s(token, ID_LEN, index);
-			token_type_temp = token_type;
-			token_type = IDENTIFIER;
-			char* prog_temp = prog;
-			prog = index;
-			char* p_zero = strchr(prog, '\0');
+			char temp[SETTINGS_ID_LEN + 1];
+			my_strcpy_s(temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
+			my_strcpy_s(G_TOKEN_BUFFER, SETTINGS_ID_LEN, index);
+			token_type_temp = G_CURRENT_TOKEN_TYPE;
+			G_CURRENT_TOKEN_TYPE = IDENTIFIER;
+			char* prog_temp = G_PROGRAM_POINTER;
+			G_PROGRAM_POINTER = index;
+			char* p_zero = strchr(G_PROGRAM_POINTER, '\0');
 			*p_zero++ = ';';
 			*p_zero = '\0';
 			eval_exp(&index_value, 1);
-			prog = prog_temp;
-			token_type = token_type_temp;
-			my_strcpy_s(token, ID_LEN, temp);
+			G_PROGRAM_POINTER = prog_temp;
+			G_CURRENT_TOKEN_TYPE = token_type_temp;
+			my_strcpy_s(G_TOKEN_BUFFER, SETTINGS_ID_LEN, temp);
 #ifdef SIMULATOR
 			/* ×ÒÅÍÈÅ*/
 			cache.trace_handler((local_array_stack[i].start_address + index_value * local_array_stack[i].sizeofop), local_array_stack[i].array_name, "r", "");
@@ -329,11 +329,11 @@ int find_var(char* s)
 
 	/* first, see if it's a local variable */
 	for (i = lvartos - 1; i >= call_stack[functos - 1].vars; i--)
-		if (!strcmp(local_var_stack[i].var_name, token))
+		if (!strcmp(local_var_stack[i].var_name, G_TOKEN_BUFFER))
 			return local_var_stack[i].value;
 
 	/* otherwise, try global vars */
-	for (i = 0; i < NUM_GLOBAL_VARS; i++)
+	for (i = 0; i < SETTINGS_NUM_GLOBAL_VARS; i++)
 		if (!strcmp(global_vars[i].var_name, s))
 			return global_vars[i].value;
 
@@ -354,8 +354,8 @@ char* find_func(char* name)
 	int i;
 
 	for (i = 0; i < func_index; i++)
-		if (!strcmp(name, func_table[i].func_name))
-			return func_table[i].loc;
+		if (!strcmp(name, G_FUNC_TABLE[i].func_name))
+			return G_FUNC_TABLE[i].loc;
 
 	return NULL;
 }
@@ -366,7 +366,7 @@ void call(void)
 	char* loc, * temp;
 	int lvartemp, larraytemp;
 
-	loc = find_func(token); /* find entry point of function */
+	loc = find_func(G_TOKEN_BUFFER); /* find entry point of function */
 	if (loc == NULL)
 		sntx_err(FUNC_UNDEF); /* function not defined */
 	else {
@@ -374,14 +374,14 @@ void call(void)
 		larraytemp = larraytos;
 		// ÍÅ !!! ÄÎÁÀÂÈË ÏÅÐÅÄÀ×Ó ÏÀÐÀÌÅÒÐÎÂ
 		get_args();  /* get function arguments */
-		temp = prog; /* save return location */
+		temp = G_PROGRAM_POINTER; /* save return location */
 		func_push(lvartemp, larraytemp);  /* save local var stack index */
-		prog = loc;  /* reset prog to start of function */
+		G_PROGRAM_POINTER = loc;  /* reset prog to start of function */
 		ret_occurring = 0; /* P the return occurring variable */
 		get_params(); /* load the function's parameters with the values of the arguments */
 		interp_block(); /* interpret the function */
 		ret_occurring = 0; /* Clear the return occurring variable */
-		prog = temp; /* reset the program pointer */
+		G_PROGRAM_POINTER = temp; /* reset the program pointer */
 		struct var_array_stack av = func_pop(); /* reset the local var stack */
 		lvartos = av.vars;
 		larraytos = av.arrays;
@@ -395,180 +395,180 @@ char get_token(void)
 
 	char* temp;
 
-	token_type = 0; tok = 0;
+	G_CURRENT_TOKEN_TYPE = 0; G_CURRENT_TOKEN = 0; // make 0 global vars...
 
-	temp = token;
-	*temp = '\0';
+	temp = G_TOKEN_BUFFER; // save pointer which linked with global TOKEN array start
+	*temp = '\0'; // save '\0' to the first byte of global array G_TOKEN
 
 	/* skip over white space */
-	while (iswhite(*prog) && *prog) ++prog;
+	while (iswhite(*G_PROGRAM_POINTER) && *G_PROGRAM_POINTER) ++G_PROGRAM_POINTER;
 
 	/* Handle Windows and Mac newlines */
-	if (*prog == '\r') {
-		++prog;
+	if (*G_PROGRAM_POINTER == '\r') {
+		++G_PROGRAM_POINTER;
 		/* Only skip \n if it exists (if it doesn't, we are running on mac) */
-		if (*prog == '\n') {
-			++prog;
+		if (*G_PROGRAM_POINTER == '\n') {
+			++G_PROGRAM_POINTER;
 		}
 		/* skip over white space */
-		while (iswhite(*prog) && *prog) ++prog;
+		while (iswhite(*G_PROGRAM_POINTER) && *G_PROGRAM_POINTER) ++G_PROGRAM_POINTER;
 	}
 
 
 
 	/* Handle Unix newlines */
-	if (*prog == '\n') {
-		++prog;
+	if (*G_PROGRAM_POINTER == '\n') {
+		++G_PROGRAM_POINTER;
 		/* skip over white space */
-		while (iswhite(*prog) && *prog) ++prog;
+		while (iswhite(*G_PROGRAM_POINTER) && *G_PROGRAM_POINTER) ++G_PROGRAM_POINTER;
 	}
 
-	if (*prog == '\0') { /* end of file */
-		*token = '\0';
-		tok = FINISHED;
-		return (token_type = DELIMITER);
+	if (*G_PROGRAM_POINTER == '\0') { /* end of file */
+		*G_TOKEN_BUFFER = '\0';
+		G_CURRENT_TOKEN = FINISHED;
+		return (G_CURRENT_TOKEN_TYPE = DELIMITER);
 	}
 
-	if (strchr("{}", *prog)) { /* block delimiters */
-		*temp = *prog;
+	if (strchr("{}", *G_PROGRAM_POINTER)) { /* block delimiters */
+		*temp = *G_PROGRAM_POINTER;
 		temp++;
 		*temp = '\0';
-		prog++;
-		return (token_type = BLOCK);
+		G_PROGRAM_POINTER++;
+		return (G_CURRENT_TOKEN_TYPE = BLOCK);
 	}
 
 	/* look for comments */
-	if (*prog == '/')
-		if (*(prog + 1) == '*') { /* is a comment */
-			prog += 2;
+	if (*G_PROGRAM_POINTER == '/')
+		if (*(G_PROGRAM_POINTER + 1) == '*') { /* is a comment */
+			G_PROGRAM_POINTER += 2;
 			do { /* find end of comment */
-				while (*prog != '*' && *prog != '\0') prog++;
-				if (*prog == '\0') {
-					prog--;
+				while (*G_PROGRAM_POINTER != '*' && *G_PROGRAM_POINTER != '\0') G_PROGRAM_POINTER++;
+				if (*G_PROGRAM_POINTER == '\0') {
+					G_PROGRAM_POINTER--;
 					break;
 				}
-				prog++;
-			} while (*prog != '/');
-			prog++;
+				G_PROGRAM_POINTER++;
+			} while (*G_PROGRAM_POINTER != '/');
+			G_PROGRAM_POINTER++;
 		}
 
 	/* look for C++ style comments */
-	if (*prog == '/')
-		if (*(prog + 1) == '/') { /* is a comment */
-			prog += 2;
+	if (*G_PROGRAM_POINTER == '/')
+		if (*(G_PROGRAM_POINTER + 1) == '/') { /* is a comment */
+			G_PROGRAM_POINTER += 2;
 			/* find end of line */
-			while (*prog != '\r' && *prog != '\n' && *prog != '\0') prog++;
-			if (*prog == '\r' && *(prog + 1) == '\n') {
-				prog++;
+			while (*G_PROGRAM_POINTER != '\r' && *G_PROGRAM_POINTER != '\n' && *G_PROGRAM_POINTER != '\0') G_PROGRAM_POINTER++;
+			if (*G_PROGRAM_POINTER == '\r' && *(G_PROGRAM_POINTER + 1) == '\n') {
+				G_PROGRAM_POINTER++;
 			}
 		}
 
 	/* look for the end of file after a comment */
-	if (*prog == '\0') { /* end of file */
-		*token = '\0';
-		tok = FINISHED;
-		return (token_type = DELIMITER);
+	if (*G_PROGRAM_POINTER == '\0') { /* end of file */
+		*G_TOKEN_BUFFER = '\0';
+		G_CURRENT_TOKEN = FINISHED;
+		return (G_CURRENT_TOKEN_TYPE = DELIMITER);
 	}
 
-	if (strchr("!<>=", *prog)) { /* is or might be
+	if (strchr("!<>=", *G_PROGRAM_POINTER)) { /* is or might be
 								   a relational operator */
-		switch (*prog) {
-		case '=': if (*(prog + 1) == '=') {
-			prog++; prog++;
+		switch (*G_PROGRAM_POINTER) {
+		case '=': if (*(G_PROGRAM_POINTER + 1) == '=') {
+			G_PROGRAM_POINTER++; G_PROGRAM_POINTER++;
 			*temp = EQ;
 			temp++; *temp = EQ; temp++;
 			*temp = '\0';
 		}
 				break;
-		case '!': if (*(prog + 1) == '=') {
-			prog++; prog++;
+		case '!': if (*(G_PROGRAM_POINTER + 1) == '=') {
+			G_PROGRAM_POINTER++; G_PROGRAM_POINTER++;
 			*temp = NE;
 			temp++; *temp = NE; temp++;
 			*temp = '\0';
 		}
 				break;
-		case '<': if (*(prog + 1) == '=') {
-			prog++; prog++;
+		case '<': if (*(G_PROGRAM_POINTER + 1) == '=') {
+			G_PROGRAM_POINTER++; G_PROGRAM_POINTER++;
 			*temp = LE; temp++; *temp = LE;
 		}
 				else {
-			prog++;
+			G_PROGRAM_POINTER++;
 			*temp = LT;
 		}
 				temp++;
 				*temp = '\0';
 				break;
-		case '>': if (*(prog + 1) == '=') {
-			prog++; prog++;
+		case '>': if (*(G_PROGRAM_POINTER + 1) == '=') {
+			G_PROGRAM_POINTER++; G_PROGRAM_POINTER++;
 			*temp = GE; temp++; *temp = GE;
 		}
 				else {
-			prog++;
+			G_PROGRAM_POINTER++;
 			*temp = GT;
 		}
 				temp++;
 				*temp = '\0';
 				break;
 		}
-		if (*token) return(token_type = DELIMITER);
+		if (*G_TOKEN_BUFFER) return(G_CURRENT_TOKEN_TYPE = DELIMITER);
 	}
 
-	if (strchr("+-*^/%=;(),'", *prog)) { /* delimiter */
-		*temp = *prog;
-		prog++; /* advance to next position */
+	if (strchr("+-*^/%=;(),'", *G_PROGRAM_POINTER)) { /* delimiter */
+		*temp = *G_PROGRAM_POINTER;
+		G_PROGRAM_POINTER++; /* advance to next position */
 		temp++;
 		*temp = '\0';
-		return (token_type = DELIMITER);
+		return (G_CURRENT_TOKEN_TYPE = DELIMITER);
 	}
 
-	if (*prog == '"') { /* quoted string */
-		prog++;
-		while ((*prog != '"' && *prog != '\r' && *prog != '\n' && *prog != '\0') || (*prog == '"' && *(prog - 1) == '\\')) *temp++ = *prog++;
-		if (*prog == '\r' || *prog == '\n' || *prog == '\0') sntx_err(SYNTAX);
-		prog++; *temp = '\0';
-		str_replace(token, "\\a", "\a");
-		str_replace(token, "\\b", "\b");
-		str_replace(token, "\\f", "\f");
-		str_replace(token, "\\n", "\n");
-		str_replace(token, "\\r", "\r");
-		str_replace(token, "\\t", "\t");
-		str_replace(token, "\\v", "\v");
-		str_replace(token, "\\\\", "\\");
-		str_replace(token, "\\\'", "\'");
-		str_replace(token, "\\\"", "\"");
-		return (token_type = STRING);
+	if (*G_PROGRAM_POINTER == '"') { /* quoted string */
+		G_PROGRAM_POINTER++;
+		while ((*G_PROGRAM_POINTER != '"' && *G_PROGRAM_POINTER != '\r' && *G_PROGRAM_POINTER != '\n' && *G_PROGRAM_POINTER != '\0') || (*G_PROGRAM_POINTER == '"' && *(G_PROGRAM_POINTER - 1) == '\\')) *temp++ = *G_PROGRAM_POINTER++;
+		if (*G_PROGRAM_POINTER == '\r' || *G_PROGRAM_POINTER == '\n' || *G_PROGRAM_POINTER == '\0') sntx_err(SYNTAX);
+		G_PROGRAM_POINTER++; *temp = '\0';
+		str_replace(G_TOKEN_BUFFER, "\\a", "\a");
+		str_replace(G_TOKEN_BUFFER, "\\b", "\b");
+		str_replace(G_TOKEN_BUFFER, "\\f", "\f");
+		str_replace(G_TOKEN_BUFFER, "\\n", "\n");
+		str_replace(G_TOKEN_BUFFER, "\\r", "\r");
+		str_replace(G_TOKEN_BUFFER, "\\t", "\t");
+		str_replace(G_TOKEN_BUFFER, "\\v", "\v");
+		str_replace(G_TOKEN_BUFFER, "\\\\", "\\");
+		str_replace(G_TOKEN_BUFFER, "\\\'", "\'");
+		str_replace(G_TOKEN_BUFFER, "\\\"", "\"");
+		return (G_CURRENT_TOKEN_TYPE = STRING);
 	}
 
-	if (isdigit((int)*prog)) { /* number */
-		while (!isdelim(*prog)) *temp++ = *prog++;
+	if (isdigit((int)*G_PROGRAM_POINTER)) { /* number */
+		while (!isdelim(*G_PROGRAM_POINTER)) *temp++ = *G_PROGRAM_POINTER++;
 		*temp = '\0';
-		return (token_type = NUMBER);
+		return (G_CURRENT_TOKEN_TYPE = NUMBER);
 	}
 
-	if (isalpha((int)*prog)) { /* var or command */
-		while (!isdelim(*prog))
+	if (isalpha((int)*G_PROGRAM_POINTER)) { /* var or command */
+		while (!isdelim(*G_PROGRAM_POINTER))
 		{
-			*temp++ = *prog++;
-			if (*prog == '[') {
-				*temp = *prog;
-				while (*prog != ']') *temp++ = *prog++;
-				*temp = *prog;
+			*temp++ = *G_PROGRAM_POINTER++; // add token into G_TOKEN array
+			if (*G_PROGRAM_POINTER == '[') {
+				*temp = *G_PROGRAM_POINTER;
+				while (*G_PROGRAM_POINTER != ']') *temp++ = *G_PROGRAM_POINTER++;
+				*temp = *G_PROGRAM_POINTER;
 				//return (token_type = IDENTIFIER);
 			}
 		}
-		token_type = TEMP;
+		G_CURRENT_TOKEN_TYPE = TEMP;
 	}
 
 	*temp = '\0';
 
 	/* see if a string is a command or a variable */
-	if (token_type == TEMP) {
-		tok = look_up(token); /* convert to internal rep */
-		if (tok) token_type = KEYWORD; /* is a keyword */
+	if (G_CURRENT_TOKEN_TYPE == TEMP) {
+		G_CURRENT_TOKEN = look_up(G_TOKEN_BUFFER); /* convert to internal rep */
+		if (G_CURRENT_TOKEN) G_CURRENT_TOKEN_TYPE = KEYWORD; /* is a keyword */
 		//else if (strchr(token, '[')) token_type = ARRAY;
-		else token_type = IDENTIFIER;
+		else G_CURRENT_TOKEN_TYPE = IDENTIFIER;
 	}
-	return token_type;
+	return G_CURRENT_TOKEN_TYPE;
 }
 
 /* Look up a token's internal representation in the
@@ -584,8 +584,8 @@ char look_up(char* s)
 	while (*p) { *p = (char)tolower(*p); p++; }
 
 	/* see if token is in table */
-	for (i = 0; *table[i].command; i++) {
-		if (!strcmp(table[i].command, s)) return table[i].tok;
+	for (i = 0; *G_KEYWORD_TOKEN_TYPE_TABLE[i].command; i++) {
+		if (!strcmp(G_KEYWORD_TOKEN_TYPE_TABLE[i].command, s)) return G_KEYWORD_TOKEN_TYPE_TABLE[i].tok;
 	}
 	return 0; /* unknown command */
 }
@@ -651,11 +651,11 @@ void sntx_err(int error)
 	};
 	printf("\n%s", e[error]);
 	p = p_buf;
-	while (p != prog && *p != '\0') {  /* find line number of error */
+	while (p != G_PROGRAM_POINTER && *p != '\0') {  /* find line number of error */
 		p++;
 		if (*p == '\r') {
 			linecount++;
-			if (p == prog) {
+			if (p == G_PROGRAM_POINTER) {
 				break;
 			}
 			/* See if this is a Windows or Mac newline */
@@ -686,20 +686,20 @@ void putback(void)
 {
 	char* t;
 
-	t = token;
-	for (; *t; t++) prog--;
+	t = G_TOKEN_BUFFER;
+	for (; *t; t++) G_PROGRAM_POINTER--;
 }
 
 void extract_array_name_index(const char* name, const char* size, const char* token, char* pos)
 {
-	char array_name_size[ID_LEN + 1];
+	char array_name_size[SETTINGS_ID_LEN + 1];
 #ifdef NEW_M
 	char temp = *pos;
 #endif
 	*pos = '\0';
 	//strcpy(array_name_size, token);
-	my_strcpy_s((char*)array_name_size, ID_LEN, token);
-	my_strcpy_s((char*)name, ID_LEN, array_name_size);
+	my_strcpy_s((char*)array_name_size, SETTINGS_ID_LEN, token);
+	my_strcpy_s((char*)name, SETTINGS_ID_LEN, array_name_size);
 #ifdef NEW_M
 	*pos = temp;
 #endif
@@ -708,7 +708,7 @@ void extract_array_name_index(const char* name, const char* size, const char* to
 	while (*pos != ']')
 		array_name_size[i++] = *pos++;
 	array_name_size[i] = '\0';
-	my_strcpy_s((char*)size, ID_LEN, array_name_size);
+	my_strcpy_s((char*)size, SETTINGS_ID_LEN, array_name_size);
 }
 
 /* Ïðîâåðÿåò, ÿâëÿåòñÿ ëè èäåíòèôèêàòîð ïåðåìåííîé. Âîâçðàùàåò 1 åñëè ÿâëÿåòñÿ
@@ -723,7 +723,7 @@ int is_var(char* s)
 			return 1;
 
 	/* otherwise, try global vars */
-	for (i = 0; i < NUM_GLOBAL_VARS; i++)
+	for (i = 0; i < SETTINGS_NUM_GLOBAL_VARS; i++)
 		if (!strcmp(global_vars[i].var_name, s))
 			return 1;
 
@@ -740,7 +740,7 @@ int is_array(char* s)
 			return 1;
 
 	/* otherwise, try global arrays */
-	for (i = 0; i < NUM_GLOBAL_ARRAYS; i++)
+	for (i = 0; i < SETTINGS_NUM_GLOBAL_ARRAYS; i++)
 		if (!strcmp(global_arrays[i].array_name, s))
 			return 1;
 
@@ -770,15 +770,15 @@ void assign_array(char* array_name, int value, char* index)
 
 			//////////////   ÄÎÁÀÂÈÒÜ ÒÓÒ   int index = 5;
 			int index_value, token_type_temp;
-			char temp[ID_LEN + 1];
-			my_strcpy_s(temp, ID_LEN, token);
-			my_strcpy_s(token, ID_LEN, index);
-			token_type_temp = token_type;
-			token_type = IDENTIFIER;
+			char temp[SETTINGS_ID_LEN + 1];
+			my_strcpy_s(temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
+			my_strcpy_s(G_TOKEN_BUFFER, SETTINGS_ID_LEN, index);
+			token_type_temp = G_CURRENT_TOKEN_TYPE;
+			G_CURRENT_TOKEN_TYPE = IDENTIFIER;
 
-			char* prog_temp = prog;
-			prog = index;
-			char* p_zero = strchr(prog, '\0');
+			char* prog_temp = G_PROGRAM_POINTER;
+			G_PROGRAM_POINTER = index;
+			char* p_zero = strchr(G_PROGRAM_POINTER, '\0');
 			*p_zero++ = ';';
 			*p_zero = '\0';
 
@@ -790,9 +790,9 @@ void assign_array(char* array_name, int value, char* index)
 
 			//printf("Index - %d, value - %d\n", index_value, value);
 
-			prog = prog_temp;
-			token_type = token_type_temp;
-			my_strcpy_s(token, ID_LEN, temp);
+			G_PROGRAM_POINTER = prog_temp;
+			G_CURRENT_TOKEN_TYPE = token_type_temp;
+			my_strcpy_s(G_TOKEN_BUFFER, SETTINGS_ID_LEN, temp);
 #ifdef SIMULATOR
 			/* ÇÀÏÈÑÜ*/
 			cache.trace_handler((local_array_stack[i].start_address + index_value * local_array_stack[i].sizeofop), local_array_stack[i].array_name, "w", "");
@@ -842,7 +842,7 @@ void assign_var(char* var_name, int value)
 	}
 	if (i < call_stack[functos - 1].vars)
 		/* if not local, try global var table */
-		for (i = 0; i < NUM_GLOBAL_VARS; i++)
+		for (i = 0; i < SETTINGS_NUM_GLOBAL_VARS; i++)
 			if (!strcmp(global_vars[i].var_name, var_name)) {
 				global_vars[i].value = value;
 				return;

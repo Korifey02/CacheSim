@@ -3,13 +3,13 @@
 #include "parser.h"
 #include "cache_memory.h"
 
-char oper_local[MAX_OPERATOR_LENGTH];
-char name_local[ID_LEN + 1];
-char size_local[ID_LEN + 1];
+char oper_local[SETTINGS_MAX_OPERATOR_LENGTH];
+char name_local[SETTINGS_ID_LEN + 1];
+char size_local[SETTINGS_ID_LEN + 1];
 char* pos_local;
 char* token_l;
 char temp_c;
-char token_local[ID_LEN + 1];
+char token_local[SETTINGS_ID_LEN + 1];
 int temp_i;
 int pos_int;
 
@@ -17,15 +17,15 @@ void eval_exp_sim_jit()
 {	
 #ifdef NUMBER_OPERATORS
 	//get_token();
-	prog++; // буква 'o'
-	int index = std::strtol(prog, &pos_local, 10);
-	prog = pos_local; 
-	prog++; // символ ';'
+	G_PROGRAM_POINTER++; // буква 'o'
+	int index = std::strtol(G_PROGRAM_POINTER, &pos_local, 10);
+	G_PROGRAM_POINTER = pos_local; 
+	G_PROGRAM_POINTER++; // символ ';'
 	//printf("%d\n", index);
-	while (*prog != ';')
+	while (*G_PROGRAM_POINTER != ';')
 	{
 	//	printf("%c", *prog);
-		prog++;
+		G_PROGRAM_POINTER++;
 	}
 	get_token();
 #else
@@ -93,11 +93,11 @@ void eval_exp_sim_jit()
 void eval_exp_sim()
 {
 	get_token();
-	if (!*token) {
+	if (!*G_TOKEN_BUFFER) {
 		sntx_err(NO_EXP);
 		return;
 	}
-	if (*token == ';') { /* пустое выражение (оператор) */
+	if (*G_TOKEN_BUFFER == ';') { /* пустое выражение (оператор) */
 		return;
 	}
 	eval_exp0_sim();
@@ -108,35 +108,35 @@ void eval_exp_sim()
 /* Обработка присваивания */
 void eval_exp0_sim()
 {
-	char temp[ID_LEN];  /* holds name of var receiving
+	char temp[SETTINGS_ID_LEN];  /* holds name of var receiving
 						   the assignment */
 	char temp_tok;
 	bool is_array_token = false;
 
-	if (token_type == IDENTIFIER) {
+	if (G_CURRENT_TOKEN_TYPE == IDENTIFIER) {
 
-		char name[ID_LEN + 1];
-		char size[ID_LEN + 1];
+		char name[SETTINGS_ID_LEN + 1];
+		char size[SETTINGS_ID_LEN + 1];
 		char* pos;
-		char token_temp[ID_LEN + 1];
+		char token_temp[SETTINGS_ID_LEN + 1];
 
 		
 
-		my_strcpy_s(token_temp, ID_LEN, token);
+		my_strcpy_s(token_temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
 		if (pos = strchr(token_temp, '['))
 		{
 			extract_array_name_index(name, size, token_temp, pos);
 			is_array_token = ::is_array(name);
 		}
-		if (is_var(token) || is_array_token) {  /* if a var, see if assignment */
-			my_strcpy_s(temp, ID_LEN, token);
-			temp_tok = token_type;
+		if (is_var(G_TOKEN_BUFFER) || is_array_token) {  /* if a var, see if assignment */
+			my_strcpy_s(temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
+			temp_tok = G_CURRENT_TOKEN_TYPE;
 			// сейчас temp - token (переменная, куда присываиваем), 
 			// is_array_token - токен является смассивом
 			// name - название массива, size - индекс			
 			// temp_tok - тип токена, т.е. IDENTIFIER
 			get_token();
-			if (*token == '=') {  /* is an assignment */
+			if (*G_TOKEN_BUFFER == '=') {  /* is an assignment */
 				not_rekurs_eval_exp0_sim = 0;
 				get_token();
 				eval_exp0_sim();  /* вычисляем выражения в правой части */
@@ -167,8 +167,8 @@ void eval_exp0_sim()
 			}
 			else {  /* not an assignment */
 				putback();  /* restore original token */
-				my_strcpy_s(token, 80, temp);
-				token_type = temp_tok;
+				my_strcpy_s(G_TOKEN_BUFFER, 80, temp);
+				G_CURRENT_TOKEN_TYPE = temp_tok;
 			}
 		}
 	}
@@ -185,7 +185,7 @@ void eval_exp1_sim()
 	};
 
 	eval_exp2_sim();
-	op = *token;
+	op = *G_TOKEN_BUFFER;
 	if (strchr(relops, op)) {
 		get_token();
 		eval_exp2_sim();		
@@ -199,7 +199,7 @@ void eval_exp2_sim()
 	int partial_value;
 
 	eval_exp3_sim();
-	while ((op = *token) == '+' || op == '-') {
+	while ((op = *G_TOKEN_BUFFER) == '+' || op == '-') {
 		get_token();
 		eval_exp3_sim();		
 	}
@@ -212,7 +212,7 @@ void eval_exp3_sim()
 	int partial_value, t;
 
 	eval_exp4_sim();
-	while ((op = *token) == '*' || op == '/' || op == '%') {
+	while ((op = *G_TOKEN_BUFFER) == '*' || op == '/' || op == '%') {
 		get_token();
 		eval_exp4_sim();		
 	}
@@ -224,8 +224,8 @@ void eval_exp4_sim()
 	char  op;
 
 	op = '\0';
-	if (*token == '+' || *token == '-') {
-		op = *token;
+	if (*G_TOKEN_BUFFER == '+' || *G_TOKEN_BUFFER == '-') {
+		op = *G_TOKEN_BUFFER;
 		get_token();
 	}
 	eval_exp5_sim();	
@@ -234,10 +234,10 @@ void eval_exp4_sim()
 /* Обработка выражений в скобках. */
 void eval_exp5_sim()
 {
-	if (*token == '(') {
+	if (*G_TOKEN_BUFFER == '(') {
 		get_token();
 		eval_exp0_sim();   /* получить выражение в скобках */
-		if (*token != ')') sntx_err(PAREN_EXPECTED);
+		if (*G_TOKEN_BUFFER != ')') sntx_err(PAREN_EXPECTED);
 		get_token();
 	}
 	else
@@ -248,17 +248,17 @@ void eval_exp5_sim()
 void atom_sim()
 {
 	int i;
-	char name[ID_LEN + 1];
-	char size[ID_LEN + 1];
-	char token_temp[ID_LEN + 1];
-	char* token_t = token;
+	char name[SETTINGS_ID_LEN + 1];
+	char size[SETTINGS_ID_LEN + 1];
+	char token_temp[SETTINGS_ID_LEN + 1];
+	char* token_t = G_TOKEN_BUFFER;
 	bool is_array_atom = 0;
 	char* pos;
 
-	switch (token_type) {
+	switch (G_CURRENT_TOKEN_TYPE) {
 	case IDENTIFIER:
 		//printf("%s ", token);	
-		my_strcpy_s(token_temp, ID_LEN, token);
+		my_strcpy_s(token_temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
 		is_array_atom = (pos = strchr(token_temp, '['));
 		if (first_iter && is_array_atom)
 		{
@@ -268,14 +268,14 @@ void atom_sim()
 			oper_plan[oper_num][index_in_oper_plan++] = DELIMITER_OPER_PLAN;
 #endif
 			tokens_read[oper_num]++;
-			tokens_read_length[oper_num][token_read_num++] = strlen(token);
+			tokens_read_length[oper_num][token_read_num++] = strlen(G_TOKEN_BUFFER);
 		}
 
-		i = internal_func(token);
+		i = internal_func(G_TOKEN_BUFFER);
 		if (i != -1) {  /* call "standard library" function */
 			(*intern_func[i].p)();
 		}
-		else if (find_func(token)) { /* call user-defined function */
+		else if (find_func(G_TOKEN_BUFFER)) { /* call user-defined function */
 			call();
 			ret_value;
 		}
@@ -298,14 +298,14 @@ void atom_sim()
 		get_token();
 		return;
 	case DELIMITER: /* see if character constant */
-		if (*token == '\'') {
-			prog++;
-			if (*prog != '\'') sntx_err(QUOTE_EXPECTED);
-			prog++;
+		if (*G_TOKEN_BUFFER == '\'') {
+			G_PROGRAM_POINTER++;
+			if (*G_PROGRAM_POINTER != '\'') sntx_err(QUOTE_EXPECTED);
+			G_PROGRAM_POINTER++;
 			get_token();
 			return;
 		}
-		if (*token == ')') return; /* process empty expression */
+		if (*G_TOKEN_BUFFER == ')') return; /* process empty expression */
 		else sntx_err(SYNTAX); /* syntax error */
 	default:
 		sntx_err(SYNTAX); /* syntax error */
@@ -317,20 +317,20 @@ void find_array_sim(char* name, char* index)
 	for (int i = larraytos - 1; i >= call_stack[functos - 1].arrays; i--) {
 		if (!strcmp(local_array_stack[i].array_name, name)) {
 			int index_value, token_type_temp;
-			char temp[ID_LEN + 1];
-			my_strcpy_s(temp, ID_LEN, token);
-			my_strcpy_s(token, ID_LEN, index);
-			token_type_temp = token_type;
-			token_type = IDENTIFIER;
-			char* prog_temp = prog;
-			prog = index;
-			char* p_zero = strchr(prog, '\0');
+			char temp[SETTINGS_ID_LEN + 1];
+			my_strcpy_s(temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
+			my_strcpy_s(G_TOKEN_BUFFER, SETTINGS_ID_LEN, index);
+			token_type_temp = G_CURRENT_TOKEN_TYPE;
+			G_CURRENT_TOKEN_TYPE = IDENTIFIER;
+			char* prog_temp = G_PROGRAM_POINTER;
+			G_PROGRAM_POINTER = index;
+			char* p_zero = strchr(G_PROGRAM_POINTER, '\0');
 			*p_zero++ = ';';
 			*p_zero = '\0';
 			eval_exp(&index_value, 1);
-			prog = prog_temp;
-			token_type = token_type_temp;
-			my_strcpy_s(token, ID_LEN, temp);
+			G_PROGRAM_POINTER = prog_temp;
+			G_CURRENT_TOKEN_TYPE = token_type_temp;
+			my_strcpy_s(G_TOKEN_BUFFER, SETTINGS_ID_LEN, temp);
 			/* ЧТЕНИЕ*/
 			cache.trace_handler((local_array_stack[i].start_address + index_value * local_array_stack[i].sizeofop), local_array_stack[i].array_name, "r", "");
 		}
@@ -346,21 +346,21 @@ void assign_array_sim(char* array_name, char* index)
 		if (!strcmp(local_array_stack[i].array_name, array_name)) {
 			//////////////   ДОБАВИТЬ ТУТ   int index = 5;
 			int index_value, token_type_temp;
-			char temp[ID_LEN + 1];
-			my_strcpy_s(temp, ID_LEN, token);
-			my_strcpy_s(token, ID_LEN, index);
-			token_type_temp = token_type;
-			token_type = IDENTIFIER;
+			char temp[SETTINGS_ID_LEN + 1];
+			my_strcpy_s(temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
+			my_strcpy_s(G_TOKEN_BUFFER, SETTINGS_ID_LEN, index);
+			token_type_temp = G_CURRENT_TOKEN_TYPE;
+			G_CURRENT_TOKEN_TYPE = IDENTIFIER;
 
-			char* prog_temp = prog;
-			prog = index;
-			char* p_zero = strchr(prog, '\0');
+			char* prog_temp = G_PROGRAM_POINTER;
+			G_PROGRAM_POINTER = index;
+			char* p_zero = strchr(G_PROGRAM_POINTER, '\0');
 			*p_zero++ = ';';
 			*p_zero = '\0';
 			eval_exp(&index_value, 1);
-			prog = prog_temp;
-			token_type = token_type_temp;
-			my_strcpy_s(token, ID_LEN, temp);
+			G_PROGRAM_POINTER = prog_temp;
+			G_CURRENT_TOKEN_TYPE = token_type_temp;
+			my_strcpy_s(G_TOKEN_BUFFER, SETTINGS_ID_LEN, temp);
 			/* ЗАПИСЬ*/
 			//printf("%d\n", index_value);
 			cache.trace_handler((local_array_stack[i].start_address + index_value * local_array_stack[i].sizeofop), local_array_stack[i].array_name, "w", "");

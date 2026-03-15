@@ -15,7 +15,7 @@ int main(int argc, char* argv[])
 	}
 
 	/* allocate memory for the program */
-	if ((p_buf = (char*)malloc(PROG_SIZE)) == NULL) {
+	if ((p_buf = (char*)malloc(SETTINGS_PROG_SIZE)) == NULL) {
 		printf("Allocation Failure");
 		exit(1);
 	}

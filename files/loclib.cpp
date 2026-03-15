@@ -22,8 +22,8 @@ int call_getche(void)
 #else
 	ch = (char)getchar();
 #endif
-	while (*prog != ')') prog++;
-	prog++;   /* advance to end of line */
+	while (*G_PROGRAM_POINTER != ')') G_PROGRAM_POINTER++;
+	G_PROGRAM_POINTER++;   /* advance to end of line */
 	return ch;
 }
 
@@ -41,15 +41,15 @@ int call_putch(void)
 int call_puts(void)
 {
 	get_token();
-	if (*token != '(') sntx_err(PAREN_EXPECTED);
+	if (*G_TOKEN_BUFFER != '(') sntx_err(PAREN_EXPECTED);
 	get_token();
-	if (token_type != STRING) sntx_err(QUOTE_EXPECTED);
-	puts(token);
+	if (G_CURRENT_TOKEN_TYPE != STRING) sntx_err(QUOTE_EXPECTED);
+	puts(G_TOKEN_BUFFER);
 	get_token();
-	if (*token != ')') sntx_err(PAREN_EXPECTED);
+	if (*G_TOKEN_BUFFER != ')') sntx_err(PAREN_EXPECTED);
 
 	get_token();
-	if (*token != ';') sntx_err(SEMI_EXPECTED);
+	if (*G_TOKEN_BUFFER != ';') sntx_err(SEMI_EXPECTED);
 	putback();
 	return 0;
 }
@@ -60,11 +60,11 @@ int print(void)
 	int i;
 
 	get_token();
-	if (*token != '(')  sntx_err(PAREN_EXPECTED);
+	if (*G_TOKEN_BUFFER != '(')  sntx_err(PAREN_EXPECTED);
 
 	get_token();
-	if (token_type == STRING) { /* output a string */
-		printf("%s ", token);
+	if (G_CURRENT_TOKEN_TYPE == STRING) { /* output a string */
+		printf("%s ", G_TOKEN_BUFFER);
 	}
 	else {  /* output a number */
 		putback();
@@ -74,10 +74,10 @@ int print(void)
 
 	get_token();
 
-	if (*token != ')') sntx_err(PAREN_EXPECTED);
+	if (*G_TOKEN_BUFFER != ')') sntx_err(PAREN_EXPECTED);
 
 	get_token();
-	if (*token != ';') sntx_err(SEMI_EXPECTED);
+	if (*G_TOKEN_BUFFER != ';') sntx_err(SEMI_EXPECTED);
 	putback();
 	return 0;
 }
@@ -88,8 +88,8 @@ int getnum(void)
 	char s[80];
 
 	if (fgets(s, sizeof(s), stdin) != NULL) {
-		while (*prog != ')') prog++;
-		prog++;  /* advance to end of line */
+		while (*G_PROGRAM_POINTER != ')') G_PROGRAM_POINTER++;
+		G_PROGRAM_POINTER++;  /* advance to end of line */
 		return atoi(s);
 	}
 	else {

@@ -56,16 +56,36 @@ using namespace std;
 #endif
 */
 enum TokenType {
-	DELIMITER, IDENTIFIER, NUMBER, KEYWORD,
-	TEMP, STRING, BLOCK, ARRAY // днаюбхк
+	DELIMITER, // 0
+	IDENTIFIER, // 1
+	NUMBER, // 2
+	KEYWORD, // 3
+	TEMP, // 4
+	STRING, // 5
+	BLOCK, // 6
+	ARRAY // днаюбхк // 7
 };
 
 /* add additional C keyword tokens here */
 enum Token {
-	ARG, CHAR, INT, IF, ELSE, FOR, DO, WHILE,
-	SWITCH, RETURN, CONTINUE, BREAK, EOL, FINISHED, END,
+	ARG, // 0
+	CHAR,// 1
+	INT,// 2
+	IF,// 3
+	ELSE,// 4
+	FOR,// 5
+	DO,// 6
+	WHILE,// 7
+	SWITCH,// 8
+	RETURN,// 9
+	CONTINUE,// 10
+	BREAK,// 11
+	EOL,// 12
+	FINISHED,// 13
+	END,// 14
 	// днаюбхк
-	DOUBLE, FLOAT
+	DOUBLE,// 15
+	FLOAT// 16
 	//
 };
 
@@ -111,8 +131,8 @@ struct array_type {
 };
 extern struct array_type global_arrays[];
 ////////////
-extern struct var_type local_var_stack[];
-extern struct array_type local_array_stack[];
+extern struct var_type G_STACK_FOR_LOCAL_VARS[];
+extern struct array_type G_STACK_FOR_LOCAL_ARRAYS[];
 
 struct array_type_sim {
 	char array_name[SETTINGS_ID_LEN];
@@ -137,7 +157,7 @@ struct var_array_stack {
 	int vars;
 	int arrays;
 };
-extern struct var_array_stack call_stack[];
+extern struct var_array_stack G_CALL_STACK[];
 // днаюбхрэ рхош
 struct commands { /* keyword lookup table */
 	char command[20];
@@ -154,9 +174,9 @@ extern int G_VAR_INDEX; /* index into global variable table */
 // днаюбхк
 extern int G_ARRAY_INDEX; /* index into global ЛЮЯЯХБШ table */
 //
-extern int lvartos; /* index into local variable stack */
+extern int G_STACK_TOP_FOR_LOCAL_VARS; /* index into local variable stack */
 // днаюбхк
-extern int larraytos; /* index into local array stack */
+extern int G_STACK_TOP_FOR_LOCAL_ARRAYS; /* index into local array stack */
 //
 
 extern int ret_value; /* function return value */

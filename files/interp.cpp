@@ -19,11 +19,11 @@ char* G_PROGRAM_POINTER = nullptr;
 jmp_buf e_buf;
 struct var_type global_vars[SETTINGS_NUM_GLOBAL_VARS];
 struct array_type global_arrays[SETTINGS_NUM_GLOBAL_ARRAYS];
-struct var_type local_var_stack[SETTINGS_NUM_LOCAL_VARS];
-struct array_type local_array_stack[SETTINGS_NUM_LOCAL_ARRAYS];
+struct var_type G_STACK_FOR_LOCAL_VARS[SETTINGS_NUM_LOCAL_VARS];
+struct array_type G_STACK_FOR_LOCAL_ARRAYS[SETTINGS_NUM_LOCAL_ARRAYS];
 struct func_type G_FUNC_TABLE[SETTINGS_NUM_FUNC];
 struct func_type func_stack[SETTINGS_NUM_FUNC];
-struct var_array_stack call_stack[SETTINGS_NUM_FUNC];
+struct var_array_stack G_CALL_STACK[SETTINGS_NUM_FUNC];
 char G_TOKEN_BUFFER[SETTINGS_MAX_TOKEN_LENGTH]; // одна переменная-буфер для одного текущего токена
 char G_CURRENT_TOKEN_TYPE = 0;
 char G_CURRENT_TOKEN = 0;
@@ -31,8 +31,8 @@ int functos = 0;
 int func_index = 0;
 int G_VAR_INDEX = 0;
 int G_ARRAY_INDEX = 0;
-int lvartos = 0;
-int larraytos = 0;
+int G_STACK_TOP_FOR_LOCAL_VARS = 0;
+int G_STACK_TOP_FOR_LOCAL_ARRAYS = 0;
 int ret_value = 0;
 int ret_occurring = 0;
 int break_occurring = 0;
@@ -103,10 +103,10 @@ int entry_interp(int argc, char* argv[])
 				  and global variables in the program */
 
 	// Верхушка стека локальных переменных — сколько переменных сейчас на стеке
-	lvartos = 0;     /* initialize local variable stack index */
+	G_STACK_TOP_FOR_LOCAL_VARS = 0;     /* initialize local variable stack index */
 	// ДОБАВИЛ
 	// То же для локальных массивов
-	larraytos = 0;     /* initialize local массивы stack index */
+	G_STACK_TOP_FOR_LOCAL_ARRAYS = 0;     /* initialize local массивы stack index */
 	// Виртуальный адрес для симулятора кэша — с какого адреса выделять следующий массив
 	start_address_arrays = 0;
 	//
@@ -229,7 +229,7 @@ void interp_block(void)
 			else return; /* is a }, so return */
 		}
 		else /* is keyword */
-			switch (G_CURRENT_TOKEN) {
+			switch (G_CURRENT_TOKEN) { // todo тут получается не хендлятся типы float double char
 			case FLOAT:
 			case DOUBLE:
 			case CHAR:
@@ -462,7 +462,7 @@ void decl_local(void)
 	// ДОБАВИЛ
 	a.a_type = G_CURRENT_TOKEN;
 	my_strcpy_s(a.array_name, SETTINGS_ID_LEN, "");
-	a.adr = (void *)G_CURRENT_TOKEN;
+	a.adr = (void *)G_CURRENT_TOKEN; // заглушка, т.к. еще не знаем массив это или нет
 	//
 	do { /* process comma-separated list */
 		get_token(); /* get var name */
@@ -530,10 +530,10 @@ void get_params(void)
 	struct var_type* p;
 	int i;
 
-	i = lvartos - 1;
+	i = G_STACK_TOP_FOR_LOCAL_VARS - 1;
 	do { /* process comma-separated list of parameters */
 		get_token();
-		p = &local_var_stack[i];
+		p = &G_STACK_FOR_LOCAL_VARS[i];
 		if (*G_TOKEN_BUFFER != ')') {
 			if (G_CURRENT_TOKEN != INT && G_CURRENT_TOKEN != CHAR)
 				sntx_err(TYPE_EXPECTED);
@@ -567,26 +567,26 @@ void func_ret(void)
 /* Push a local variable. */
 void local_push(struct var_type i)
 {
-	if (lvartos >= SETTINGS_NUM_LOCAL_VARS) {
+	if (G_STACK_TOP_FOR_LOCAL_VARS >= SETTINGS_NUM_LOCAL_VARS) {
 		sntx_err(TOO_MANY_LVARS);
 	}
 	else {
-		local_var_stack[lvartos] = i;
+		G_STACK_FOR_LOCAL_VARS[G_STACK_TOP_FOR_LOCAL_VARS] = i;
 		//vars[i.var_name] = lvartos;
-		lvartos++;
+		G_STACK_TOP_FOR_LOCAL_VARS++;
 	}
 }
 
 /* Push a local массив. */
 void local_push_array(struct array_type a)
 {
-	if (larraytos >= SETTINGS_NUM_LOCAL_ARRAYS) {
+	if (G_STACK_TOP_FOR_LOCAL_ARRAYS >= SETTINGS_NUM_LOCAL_ARRAYS) {
 		sntx_err(TOO_MANY_LARRAYS);
 	}
 	else {
-		local_array_stack[larraytos] = a;
+		G_STACK_FOR_LOCAL_ARRAYS[G_STACK_TOP_FOR_LOCAL_ARRAYS] = a;
 		//arrays[a.array_name] = larraytos;
-		larraytos++;
+		G_STACK_TOP_FOR_LOCAL_ARRAYS++;
 	}
 }
 
@@ -602,7 +602,7 @@ struct var_array_stack func_pop(void)
 		sntx_err(NEST_FUNC);
 	}
 	else {
-		index = call_stack[functos];
+		index = G_CALL_STACK[functos];
 	}
 
 	return index;
@@ -615,8 +615,8 @@ void func_push(int vars, int arrays)
 		sntx_err(NEST_FUNC);
 	}
 	else {
-		call_stack[functos].vars = vars;
-		call_stack[functos].arrays = arrays;
+		G_CALL_STACK[functos].vars = vars;
+		G_CALL_STACK[functos].arrays = arrays;
 		functos++;
 	}
 }
@@ -625,9 +625,9 @@ void func_push(int vars, int arrays)
 void* find_array_addr(char* name)
 {
 	int i;
-	for (i = larraytos - 1; i >= call_stack[functos - 1].arrays; i--)
-		if (!strcmp(local_array_stack[i].array_name, name))
-			return local_array_stack[i].adr;
+	for (i = G_STACK_TOP_FOR_LOCAL_ARRAYS - 1; i >= G_CALL_STACK[functos - 1].arrays; i--)
+		if (!strcmp(G_STACK_FOR_LOCAL_ARRAYS[i].array_name, name))
+			return G_STACK_FOR_LOCAL_ARRAYS[i].adr;
 }
 
 /* Execute an if statement. */

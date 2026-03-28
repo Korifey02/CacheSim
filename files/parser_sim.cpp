@@ -314,8 +314,8 @@ void atom_sim()
 
 void find_array_sim(char* name, char* index)
 {
-	for (int i = larraytos - 1; i >= call_stack[functos - 1].arrays; i--) {
-		if (!strcmp(local_array_stack[i].array_name, name)) {
+	for (int i = G_STACK_TOP_FOR_LOCAL_ARRAYS - 1; i >= G_CALL_STACK[functos - 1].arrays; i--) {
+		if (!strcmp(G_STACK_FOR_LOCAL_ARRAYS[i].array_name, name)) {
 			int index_value, token_type_temp;
 			char temp[SETTINGS_ID_LEN + 1];
 			my_strcpy_s(temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
@@ -332,7 +332,7 @@ void find_array_sim(char* name, char* index)
 			G_CURRENT_TOKEN_TYPE = token_type_temp;
 			my_strcpy_s(G_TOKEN_BUFFER, SETTINGS_ID_LEN, temp);
 			/* ×ÒÅÍÈÅ*/
-			cache.trace_handler((local_array_stack[i].start_address + index_value * local_array_stack[i].sizeofop), local_array_stack[i].array_name, "r", "");
+			cache.trace_handler((G_STACK_FOR_LOCAL_ARRAYS[i].start_address + index_value * G_STACK_FOR_LOCAL_ARRAYS[i].sizeofop), G_STACK_FOR_LOCAL_ARRAYS[i].array_name, "r", "");
 		}
 	}
 }
@@ -342,8 +342,8 @@ void assign_array_sim(char* array_name, char* index)
 {
 	int com = strcmp(array_name, "c");
 
-	for (int i = larraytos - 1; i >= call_stack[functos - 1].arrays; i--) {
-		if (!strcmp(local_array_stack[i].array_name, array_name)) {
+	for (int i = G_STACK_TOP_FOR_LOCAL_ARRAYS - 1; i >= G_CALL_STACK[functos - 1].arrays; i--) {
+		if (!strcmp(G_STACK_FOR_LOCAL_ARRAYS[i].array_name, array_name)) {
 			//////////////   ÄÎÁÀÂÈÒÜ ÒÓÒ   int index = 5;
 			int index_value, token_type_temp;
 			char temp[SETTINGS_ID_LEN + 1];
@@ -363,7 +363,7 @@ void assign_array_sim(char* array_name, char* index)
 			my_strcpy_s(G_TOKEN_BUFFER, SETTINGS_ID_LEN, temp);
 			/* ÇÀÏÈÑÜ*/
 			//printf("%d\n", index_value);
-			cache.trace_handler((local_array_stack[i].start_address + index_value * local_array_stack[i].sizeofop), local_array_stack[i].array_name, "w", "");
+			cache.trace_handler((G_STACK_FOR_LOCAL_ARRAYS[i].start_address + index_value * G_STACK_FOR_LOCAL_ARRAYS[i].sizeofop), G_STACK_FOR_LOCAL_ARRAYS[i].array_name, "w", "");
 			//cache.trace_handler((arrays[array_name]->start_address + index_value * arrays[array_name]->sizeofop), arrays[array_name]->array_name, "w", "");
 			return;
 		}

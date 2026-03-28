@@ -278,8 +278,8 @@ int find_array(char* name, char* index)
 	double* dp;
 	int adr_to_file;
 
-	for (i = larraytos - 1; i >= call_stack[functos - 1].arrays; i--) {
-		if (!strcmp(local_array_stack[i].array_name, name)) {
+	for (i = G_STACK_TOP_FOR_LOCAL_ARRAYS - 1; i >= G_CALL_STACK[functos - 1].arrays; i--) {
+		if (!strcmp(G_STACK_FOR_LOCAL_ARRAYS[i].array_name, name)) {
 			int index_value, token_type_temp;
 			char temp[SETTINGS_ID_LEN + 1];
 			my_strcpy_s(temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
@@ -299,22 +299,22 @@ int find_array(char* name, char* index)
 			/* ×ÒÅÍÈÅ*/
 			cache.trace_handler((local_array_stack[i].start_address + index_value * local_array_stack[i].sizeofop), local_array_stack[i].array_name, "r", "");
 #endif
-			switch (local_array_stack[i].a_type)
+			switch (G_STACK_FOR_LOCAL_ARRAYS[i].a_type)
 			{
 			case CHAR:
-				cp = (char*)local_array_stack[i].adr;
+				cp = (char*)G_STACK_FOR_LOCAL_ARRAYS[i].adr;
 				return *(cp + index_value);
 				break;
 			case INT:
-				ip = (int*)local_array_stack[i].adr;
+				ip = (int*)G_STACK_FOR_LOCAL_ARRAYS[i].adr;
 				return *(ip + index_value);
 				break;
 			case FLOAT:
-				fp = (float*)local_array_stack[i].adr;
+				fp = (float*)G_STACK_FOR_LOCAL_ARRAYS[i].adr;
 				return *(fp + index_value);
 				break;
 			case DOUBLE:
-				dp = (double*)local_array_stack[i].adr;
+				dp = (double*)G_STACK_FOR_LOCAL_ARRAYS[i].adr;
 				return *(dp + index_value);
 				break;
 			}
@@ -328,9 +328,9 @@ int find_var(char* s)
 	int i;
 
 	/* first, see if it's a local variable */
-	for (i = lvartos - 1; i >= call_stack[functos - 1].vars; i--)
-		if (!strcmp(local_var_stack[i].var_name, G_TOKEN_BUFFER))
-			return local_var_stack[i].value;
+	for (i = G_STACK_TOP_FOR_LOCAL_VARS - 1; i >= G_CALL_STACK[functos - 1].vars; i--)
+		if (!strcmp(G_STACK_FOR_LOCAL_VARS[i].var_name, G_TOKEN_BUFFER))
+			return G_STACK_FOR_LOCAL_VARS[i].value;
 
 	/* otherwise, try global vars */
 	for (i = 0; i < SETTINGS_NUM_GLOBAL_VARS; i++)
@@ -364,18 +364,18 @@ char* find_func(char* name)
 void call(void)
 {
 	char* loc, * temp;
-	int lvartemp, larraytemp;
+	int stack_top_for_locacl_vars, stack_top_for_local_arrays;
 
 	loc = find_func(G_TOKEN_BUFFER); /* find entry point of function */
 	if (loc == NULL)
 		sntx_err(FUNC_UNDEF); /* function not defined */
 	else {
-		lvartemp = lvartos;  /* save local var stack index */
-		larraytemp = larraytos;
+		stack_top_for_locacl_vars = G_STACK_TOP_FOR_LOCAL_VARS;  /* save local var stack index */
+		stack_top_for_local_arrays = G_STACK_TOP_FOR_LOCAL_ARRAYS;
 		// ÍÅ !!! ÄÎÁÀÂÈË ÏÅÐÅÄÀ×Ó ÏÀÐÀÌÅÒÐÎÂ
 		get_args();  /* get function arguments */
 		temp = G_PROGRAM_POINTER; /* save return location */
-		func_push(lvartemp, larraytemp);  /* save local var stack index */
+		func_push(stack_top_for_locacl_vars, stack_top_for_local_arrays);  /* save local var stack index */
 		G_PROGRAM_POINTER = loc;  /* reset prog to start of function */
 		ret_occurring = 0; /* P the return occurring variable */
 		get_params(); /* load the function's parameters with the values of the arguments */
@@ -383,8 +383,8 @@ void call(void)
 		ret_occurring = 0; /* Clear the return occurring variable */
 		G_PROGRAM_POINTER = temp; /* reset the program pointer */
 		struct var_array_stack av = func_pop(); /* reset the local var stack */
-		lvartos = av.vars;
-		larraytos = av.arrays;
+		G_STACK_TOP_FOR_LOCAL_VARS = av.vars;
+		G_STACK_TOP_FOR_LOCAL_ARRAYS = av.arrays;
 	}
 }
 
@@ -681,7 +681,7 @@ void sntx_err(int error)
 	longjmp(e_buf, 1); /* return to safe point */
 }
 
-/* Return a token to input stream. */
+/* Return a token to input stream. */  // âîçâðàùàåì óêàçàòåëü ïî G_PROGRAM_POINTER â íà÷àëî ïîñëåäíåãî ðàñïàðøåííîãî òîêåíà
 void putback(void)
 {
 	char* t;
@@ -718,8 +718,8 @@ int is_var(char* s)
 	int i;
 
 	/* first, see if it's a local variable */
-	for (i = lvartos - 1; i >= call_stack[functos - 1].vars; i--)
-		if (!strcmp(local_var_stack[i].var_name, s))
+	for (i = G_STACK_TOP_FOR_LOCAL_VARS - 1; i >= G_CALL_STACK[functos - 1].vars; i--)
+		if (!strcmp(G_STACK_FOR_LOCAL_VARS[i].var_name, s))
 			return 1;
 
 	/* otherwise, try global vars */
@@ -735,8 +735,8 @@ int is_array(char* s)
 	int i;
 
 	/* first, see if it's a local variable */
-	for (i = larraytos - 1; i >= call_stack[functos - 1].arrays; i--)
-		if (!strcmp(local_array_stack[i].array_name, s))
+	for (i = G_STACK_TOP_FOR_LOCAL_ARRAYS - 1; i >= G_CALL_STACK[functos - 1].arrays; i--)
+		if (!strcmp(G_STACK_FOR_LOCAL_ARRAYS[i].array_name, s))
 			return 1;
 
 	/* otherwise, try global arrays */
@@ -762,8 +762,8 @@ void assign_array(char* array_name, int value, char* index)
 
 	int com = strcmp(array_name, "c");
 
-	for (i = larraytos - 1; i >= call_stack[functos - 1].arrays; i--) {
-		if (!strcmp(local_array_stack[i].array_name, array_name)) {
+	for (i = G_STACK_TOP_FOR_LOCAL_ARRAYS - 1; i >= G_CALL_STACK[functos - 1].arrays; i--) {
+		if (!strcmp(G_STACK_FOR_LOCAL_ARRAYS[i].array_name, array_name)) {
 
 			//printf("Found - %s\n", array_name);
 			//i_debug = i;
@@ -798,22 +798,22 @@ void assign_array(char* array_name, int value, char* index)
 			cache.trace_handler((local_array_stack[i].start_address + index_value * local_array_stack[i].sizeofop), local_array_stack[i].array_name, "w", "");
 #endif
 
-			switch (local_array_stack[i].a_type)
+			switch (G_STACK_FOR_LOCAL_ARRAYS[i].a_type)
 			{
 			case CHAR:
-				cp = (char*)local_array_stack[i].adr;
+				cp = (char*)G_STACK_FOR_LOCAL_ARRAYS[i].adr;
 				*(cp + index_value) = (char)value;
 				break;
 			case INT:
-				ip = (int*)local_array_stack[i].adr;
+				ip = (int*)G_STACK_FOR_LOCAL_ARRAYS[i].adr;
 				*(ip + index_value) = (int)value;
 				break;
 			case FLOAT:
-				fp = (float*)local_array_stack[i].adr;
+				fp = (float*)G_STACK_FOR_LOCAL_ARRAYS[i].adr;
 				*(fp + index_value) = (float)value;
 				break;
 			case DOUBLE:
-				dp = (double*)local_array_stack[i].adr;
+				dp = (double*)G_STACK_FOR_LOCAL_ARRAYS[i].adr;
 				*(dp + index_value) = (double)value;
 				break;
 			}
@@ -834,13 +834,13 @@ void assign_var(char* var_name, int value)
 	int i;
 
 	/* first, see if it's a local variable */
-	for (i = lvartos - 1; i >= call_stack[functos - 1].vars; i--) {
-		if (!strcmp(local_var_stack[i].var_name, var_name)) {
-			local_var_stack[i].value = value;
+	for (i = G_STACK_TOP_FOR_LOCAL_VARS - 1; i >= G_CALL_STACK[functos - 1].vars; i--) {
+		if (!strcmp(G_STACK_FOR_LOCAL_VARS[i].var_name, var_name)) {
+			G_STACK_FOR_LOCAL_VARS[i].value = value;
 			return;
 		}
 	}
-	if (i < call_stack[functos - 1].vars)
+	if (i < G_CALL_STACK[functos - 1].vars)
 		/* if not local, try global var table */
 		for (i = 0; i < SETTINGS_NUM_GLOBAL_VARS; i++)
 			if (!strcmp(global_vars[i].var_name, var_name)) {

@@ -1,4 +1,4 @@
-//#define _CRT_SECURE_NO_WARNINGS // НУЖНО ПОТОМ БУДЕТ УБРАТЬ
+//#define _CRT_SECURE_NO_WARNINGS // РќРЈР–РќРћ РџРћРўРћРњ Р‘РЈР”Р•Рў РЈР‘Р РђРўР¬
 
 #include <cstdio> 
 #include <csetjmp>
@@ -24,7 +24,7 @@ struct array_type G_STACK_FOR_LOCAL_ARRAYS[SETTINGS_NUM_LOCAL_ARRAYS];
 struct func_type G_FUNC_TABLE[SETTINGS_NUM_FUNC];
 struct func_type func_stack[SETTINGS_NUM_FUNC];
 struct var_array_stack G_CALL_STACK[SETTINGS_NUM_FUNC];
-char G_TOKEN_BUFFER[SETTINGS_MAX_TOKEN_LENGTH]; // одна переменная-буфер для одного текущего токена
+char G_TOKEN_BUFFER[SETTINGS_MAX_TOKEN_LENGTH]; // РѕРґРЅР° РїРµСЂРµРјРµРЅРЅР°СЏ-Р±СѓС„РµСЂ РґР»СЏ РѕРґРЅРѕРіРѕ С‚РµРєСѓС‰РµРіРѕ С‚РѕРєРµРЅР°
 char G_CURRENT_TOKEN_TYPE = 0;
 char G_CURRENT_TOKEN = 0;
 int functos = 0;
@@ -93,26 +93,28 @@ int entry_interp(int argc, char* argv[])
 	if (setjmp(e_buf)) exit(1); /* initialize long jump buffer */
 
 	G_VAR_INDEX = 0;  /* initialize global variable index */
-	// ДОБАВИЛ
-	G_ARRAY_INDEX = 0;  /* initialize global массивы index */
+	// Р”РћР‘РђР’РР›
+	G_ARRAY_INDEX = 0;  /* initialize global РјР°СЃСЃРёРІС‹ index */
 	//
 
+	// Initialize virtual addresses before prescan so locals continue after globals.
+	start_address_arrays = 0;
+	//
 	/* set program pointer to start of program buffer */
 	G_PROGRAM_POINTER = p_buf;
 	prescan(); /* find the location of all functions
 				  and global variables in the program */
 
-	// Верхушка стека локальных переменных — сколько переменных сейчас на стеке
+	// Р’РµСЂС…СѓС€РєР° СЃС‚РµРєР° Р»РѕРєР°Р»СЊРЅС‹С… РїРµСЂРµРјРµРЅРЅС‹С… вЂ” СЃРєРѕР»СЊРєРѕ РїРµСЂРµРјРµРЅРЅС‹С… СЃРµР№С‡Р°СЃ РЅР° СЃС‚РµРєРµ
 	G_STACK_TOP_FOR_LOCAL_VARS = 0;     /* initialize local variable stack index */
-	// ДОБАВИЛ
-	// То же для локальных массивов
-	G_STACK_TOP_FOR_LOCAL_ARRAYS = 0;     /* initialize local массивы stack index */
-	// Виртуальный адрес для симулятора кэша — с какого адреса выделять следующий массив
-	start_address_arrays = 0;
+	// Р”РћР‘РђР’РР›
+	// РўРѕ Р¶Рµ РґР»СЏ Р»РѕРєР°Р»СЊРЅС‹С… РјР°СЃСЃРёРІРѕРІ
+	G_STACK_TOP_FOR_LOCAL_ARRAYS = 0;     /* initialize local РјР°СЃСЃРёРІС‹ stack index */
+	// Р’РёСЂС‚СѓР°Р»СЊРЅС‹Р№ Р°РґСЂРµСЃ РґР»СЏ СЃРёРјСѓР»СЏС‚РѕСЂР° РєСЌС€Р° вЂ” СЃ РєР°РєРѕРіРѕ Р°РґСЂРµСЃР° РІС‹РґРµР»СЏС‚СЊ СЃР»РµРґСѓСЋС‰РёР№ РјР°СЃСЃРёРІ
 	//
-	// Глубина стека вызовов функций
+	// Р“Р»СѓР±РёРЅР° СЃС‚РµРєР° РІС‹Р·РѕРІРѕРІ С„СѓРЅРєС†РёР№
 	functos = 0;     /* initialize the CALL stack index */
-	// Флаг что встретился break — сейчас не активен
+	// Р¤Р»Р°Рі С‡С‚Рѕ РІСЃС‚СЂРµС‚РёР»СЃСЏ break вЂ” СЃРµР№С‡Р°СЃ РЅРµ Р°РєС‚РёРІРµРЅ
 	break_occurring = 0; /* initialize the break occurring flag */
 
 	/* setup call to main() */
@@ -155,10 +157,10 @@ void interp_block(void)
 			putback();  /* restore token to input stream for
 						   further processing by eval_exp() */
 			// !!!!!!!!!!!!!!!!!
-			// ЗДЕСЬ ДЛЯ УСКОРЕНИЯ  МОДЕЛИРВОАНИЯ НЕОБХОДИМО СДЕЛАТЬ ДРУГОЙ СТЕК eval_exp
+			// Р—Р”Р•РЎР¬ Р”Р›РЇ РЈРЎРљРћР Р•РќРРЇ  РњРћР”Р•Р›РР Р’РћРђРќРРЇ РќР•РћР‘РҐРћР”РРњРћ РЎР”Р•Р›РђРўР¬ Р”Р РЈР“РћР™ РЎРўР•Рљ eval_exp
 			// !!!!!!!!!!!!!!!!!
-#ifdef FAST_SIMULATOR		// ПОКА "быстрая" СИМУЛЯЦИЯ только в это мрежиме
-							// значит только циклы
+#ifdef FAST_SIMULATOR		// РџРћРљРђ "Р±С‹СЃС‚СЂР°СЏ" РЎРРњРЈР›РЇР¦РРЇ С‚РѕР»СЊРєРѕ РІ СЌС‚Рѕ РјСЂРµР¶РёРјРµ
+							// Р·РЅР°С‡РёС‚ С‚РѕР»СЊРєРѕ С†РёРєР»С‹
 			if (in_cycle && first_iter)
 			{
 #endif
@@ -172,7 +174,7 @@ void interp_block(void)
 					//putback();
 #else
 				
-					// Нужно прочитать оператор целиком				
+					// РќСѓР¶РЅРѕ РїСЂРѕС‡РёС‚Р°С‚СЊ РѕРїРµСЂР°С‚РѕСЂ С†РµР»РёРєРѕРј				
 					//putback();
 					char* temp = prog;
 					char* temp_oper = oper[oper_num];
@@ -183,8 +185,8 @@ void interp_block(void)
 					//get_token();				
 #endif
 				}
-#ifdef FAST_SIMULATOR		// ПОКА "быстрая" СИМУЛЯЦИЯ только в это мрежиме
-							// значит только циклы
+#ifdef FAST_SIMULATOR		// РџРћРљРђ "Р±С‹СЃС‚СЂР°СЏ" РЎРРњРЈР›РЇР¦РРЇ С‚РѕР»СЊРєРѕ РІ СЌС‚Рѕ РјСЂРµР¶РёРјРµ
+							// Р·РЅР°С‡РёС‚ С‚РѕР»СЊРєРѕ С†РёРєР»С‹
 			}
 #endif
 			if (in_cycle)
@@ -200,8 +202,8 @@ void interp_block(void)
 			eval_exp(&value, 1);  /* process the expression */
 #endif
 			if (*G_TOKEN_BUFFER != ';') sntx_err(SEMI_EXPECTED);
-#ifdef FAST_SIMULATOR		// ПОКА "быстрая" СИМУЛЯЦИЯ только в это мрежиме
-							// значит только циклы
+#ifdef FAST_SIMULATOR		// РџРћРљРђ "Р±С‹СЃС‚СЂР°СЏ" РЎРРњРЈР›РЇР¦РРЇ С‚РѕР»СЊРєРѕ РІ СЌС‚Рѕ РјСЂРµР¶РёРјРµ
+							// Р·РЅР°С‡РёС‚ С‚РѕР»СЊРєРѕ С†РёРєР»С‹
 			if (in_cycle && first_iter)
 			{
 #endif
@@ -210,7 +212,7 @@ void interp_block(void)
 				//printf("%s\n", oper[oper_num]);
 				//printf("%s\n", oper_plan[oper_num]);
 #ifdef NUMBER_OPERATORS
-				// помечаем оператор
+				// РїРѕРјРµС‡Р°РµРј РѕРїРµСЂР°С‚РѕСЂ
 				* operator_start++ = 'o';
 				 snprintf(operator_start, 10, "%d; ", oper_num);
 				//_itoa(oper_num, operator_start, 10);
@@ -218,8 +220,8 @@ void interp_block(void)
 				oper_num++;
 				index_in_oper_plan = 0;			
 #endif
-#ifdef FAST_SIMULATOR		// ПОКА "быстрая" СИМУЛЯЦИЯ только в это мрежиме
-							// значит только циклы	
+#ifdef FAST_SIMULATOR		// РџРћРљРђ "Р±С‹СЃС‚СЂР°СЏ" РЎРРњРЈР›РЇР¦РРЇ С‚РѕР»СЊРєРѕ РІ СЌС‚Рѕ РјСЂРµР¶РёРјРµ
+							// Р·РЅР°С‡РёС‚ С‚РѕР»СЊРєРѕ С†РёРєР»С‹	
 			}
 #endif
 		}
@@ -229,7 +231,7 @@ void interp_block(void)
 			else return; /* is a }, so return */
 		}
 		else /* is keyword */
-			switch (G_CURRENT_TOKEN) { // todo тут получается не хендлятся типы float double char
+			switch (G_CURRENT_TOKEN) { // todo С‚СѓС‚ РїРѕР»СѓС‡Р°РµС‚СЃСЏ РЅРµ С…РµРЅРґР»СЏС‚СЃСЏ С‚РёРїС‹ float double char
 			case FLOAT:
 			case DOUBLE:
 			case CHAR:
@@ -403,8 +405,8 @@ void* extract_array_decl(const char* name, char* pos, int vartype, char* token_t
 }
 
 
-/* Declare a global variable */  // ИЛИ МАССИВ
-void decl_global(void) // todo с ней пока не раскуриливал
+/* Declare a global variable */  // РР›Р РњРђРЎРЎРР’
+void decl_global(void) // todo СЃ РЅРµР№ РїРѕРєР° РЅРµ СЂР°СЃРєСѓСЂРёР»РёРІР°Р»
 {
 	int vartype;
 
@@ -413,14 +415,14 @@ void decl_global(void) // todo с ней пока не раскуриливал
 	vartype = G_CURRENT_TOKEN; /* save var type */
 
 	do { /* process comma-separated list */
-		// ДОБАВИЛ - ИЗМЕНИЛ
+		// Р”РћР‘РђР’РР› - РР—РњР•РќРР›
 		get_token();  /* get name */
 		char* pos;
 		char token_temp[SETTINGS_ID_LEN + 1];
 		my_strcpy_s(token_temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
 		if (pos = strchr(token_temp, '['))
 		{
-			// МАССИВ			
+			// РњРђРЎРЎРР’			
 			global_arrays[G_ARRAY_INDEX].a_type = vartype;
 			int size, sizeofop;
 			global_arrays[G_ARRAY_INDEX].adr = extract_array_decl(global_arrays[G_ARRAY_INDEX].array_name, pos, vartype, token_temp, &size, &sizeofop);
@@ -430,12 +432,12 @@ void decl_global(void) // todo с ней пока не раскуриливал
 			start_address_arrays += size * sizeofop;
 			G_ARRAY_INDEX++;
 #ifdef SIMULATOR
-			cache.map_init_sim(global_arrays[garray_index].array_name);
+			cache.map_init_sim(global_arrays[G_ARRAY_INDEX - 1].array_name);
 #endif
 		}
 		else
 		{
-			// ПЕРЕМЕННАЯ
+			// РџР•Р Р•РњР•РќРќРђРЇ
 			global_vars[G_VAR_INDEX].v_type = vartype;
 			global_vars[G_VAR_INDEX].value = 0;  /* init to 0 */
 			my_strcpy_s(global_vars[G_VAR_INDEX].var_name, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
@@ -452,27 +454,27 @@ void decl_global(void) // todo с ней пока не раскуриливал
 void decl_local(void)
 {
 	struct var_type i;
-	// ДОБАВИЛ
+	// Р”РћР‘РђР’РР›
 	struct array_type a;
 	//
 	get_token();  /* get type */
 
 	i.v_type = G_CURRENT_TOKEN;
 	i.value = 0;  /* init to 0 */
-	// ДОБАВИЛ
+	// Р”РћР‘РђР’РР›
 	a.a_type = G_CURRENT_TOKEN;
 	my_strcpy_s(a.array_name, SETTINGS_ID_LEN, "");
-	a.adr = (void *)G_CURRENT_TOKEN; // заглушка, т.к. еще не знаем массив это или нет
+	a.adr = (void *)G_CURRENT_TOKEN; // Р·Р°РіР»СѓС€РєР°, С‚.Рє. РµС‰Рµ РЅРµ Р·РЅР°РµРј РјР°СЃСЃРёРІ СЌС‚Рѕ РёР»Рё РЅРµС‚
 	//
 	do { /* process comma-separated list */
 		get_token(); /* get var name */
-		// ИЗМЕНИЛ
+		// РР—РњР•РќРР›
 		char* pos;
 		char token_temp[SETTINGS_ID_LEN + 1];
 		my_strcpy_s(token_temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
 		if (pos = strchr(token_temp, '['))
 		{
-			// МАССИВ
+			// РњРђРЎРЎРР’
 			int size, sizeofop;
 			a.adr = extract_array_decl(a.array_name, pos, a.a_type, token_temp, &size, &sizeofop);
 			a.size = size;
@@ -486,7 +488,7 @@ void decl_local(void)
 		}
 		else
 		{
-			// ПЕРЕМЕННАЯ
+			// РџР•Р Р•РњР•РќРќРђРЇ
 			my_strcpy_s(i.var_name, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
 			local_push(i);
 		}
@@ -577,7 +579,7 @@ void local_push(struct var_type i)
 	}
 }
 
-/* Push a local массив. */
+/* Push a local РјР°СЃСЃРёРІ. */
 void local_push_array(struct array_type a)
 {
 	if (G_STACK_TOP_FOR_LOCAL_ARRAYS >= SETTINGS_NUM_LOCAL_ARRAYS) {
@@ -621,7 +623,7 @@ void func_push(int vars, int arrays)
 	}
 }
 
-// ДОБАВИЛ
+// Р”РћР‘РђР’РР›
 void* find_array_addr(char* name)
 {
 	int i;
@@ -735,9 +737,9 @@ void exec_for(void)
 	if (!in_cycle)
 	{
 		/// !!!!!!!!!!!!!!!!!
-		/// Здесь устанавливаем переменуую "первая итерация цикла"
-		first_iter = 1;			// ПОКА ЭТО КОСТЫЛЬ - НЕ ОБРАБАТЫВАЮТСЯ 
-		// ВЛОЖЕННЫЕ ЦИКЛЫ хотя может и правльно ?
+		/// Р—РґРµСЃСЊ СѓСЃС‚Р°РЅР°РІР»РёРІР°РµРј РїРµСЂРµРјРµРЅСѓСѓСЋ "РїРµСЂРІР°СЏ РёС‚РµСЂР°С†РёСЏ С†РёРєР»Р°"
+		first_iter = 1;			// РџРћРљРђ Р­РўРћ РљРћРЎРўР«Р›Р¬ - РќР• РћР‘Р РђР‘РђРўР«Р’РђР®РўРЎРЇ 
+		// Р’Р›РћР–Р•РќРќР«Р• Р¦РРљР›Р« С…РѕС‚СЏ РјРѕР¶РµС‚ Рё РїСЂР°РІР»СЊРЅРѕ ?
 		/// !!!!!!!!!!!!!!!!!
 		oper_num = 0;
 		tokens_read[oper_num] = 0;
@@ -756,7 +758,7 @@ void exec_for(void)
 		if (*G_TOKEN_BUFFER != ';') sntx_err(SEMI_EXPECTED);
 		G_PROGRAM_POINTER++; /* get past the ; */
 		temp2 = G_PROGRAM_POINTER;
-		// НЕ !!! ДОБАВИЛ УСЛОВИЯ С МАССИВАМИ
+		// РќР• !!! Р”РћР‘РђР’РР› РЈРЎР›РћР’РРЇ РЎ РњРђРЎРЎРР’РђРњР
 		/* find the start of the for block */
 		brace = 1;
 		while (brace) {
@@ -768,7 +770,7 @@ void exec_for(void)
 		if (cond) {
 			interp_block();  /* if true, interpret */
 			/// !!!!!!!!!!!!!!!!!
-			/// Здесь сбрасываем переменуую "первая итерация цикла"
+			/// Р—РґРµСЃСЊ СЃР±СЂР°СЃС‹РІР°РµРј РїРµСЂРµРјРµРЅСѓСѓСЋ "РїРµСЂРІР°СЏ РёС‚РµСЂР°С†РёСЏ С†РёРєР»Р°"
 			first_iter = 0;
 			/// !!!!!!!!!!!!!!!!!
 			if (ret_occurring > 0) {
@@ -780,10 +782,10 @@ void exec_for(void)
 			}
 		}
 		else {  /* otherwise, skip around loop */
-			// ПРОБЛЕМА ЗДЕСЬ
+			// РџР РћР‘Р›Р•РњРђ Р—Р”Р•РЎР¬
 			find_eob();
 			// !!!!!!!!!!!!!!!!
-			// Здесь унитожаем все структуры, связанные с циклом
+			// Р—РґРµСЃСЊ СѓРЅРёС‚РѕР¶Р°РµРј РІСЃРµ СЃС‚СЂСѓРєС‚СѓСЂС‹, СЃРІСЏР·Р°РЅРЅС‹Рµ СЃ С†РёРєР»РѕРј
 			// !!!!!!!!!!!!!!!!
 			in_cycle--;
 			/*

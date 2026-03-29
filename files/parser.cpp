@@ -13,8 +13,73 @@
 #include "interp.h"
 #include "cache_memory.h"
 
-// ƒŒ¡¿¬»“‹ - »«Ã≈Õ»“‹ - Õ≈ “ŒÀ‹ Œ INT
-/* ¬ıÓ‰ ‚ Ô‡ÒÂ.*/
+static int eval_array_index_expression(char* index)
+{
+	int index_value = 0;
+	int token_type_temp;
+	char temp[SETTINGS_ID_LEN + 1];
+
+	my_strcpy_s(temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
+	my_strcpy_s(G_TOKEN_BUFFER, SETTINGS_ID_LEN, index);
+	token_type_temp = G_CURRENT_TOKEN_TYPE;
+	G_CURRENT_TOKEN_TYPE = IDENTIFIER;
+
+	char* prog_temp = G_PROGRAM_POINTER;
+	G_PROGRAM_POINTER = index;
+	char* p_zero = strchr(G_PROGRAM_POINTER, '\0');
+	*p_zero++ = ';';
+	*p_zero = '\0';
+
+	eval_exp(&index_value, 1);
+
+	G_PROGRAM_POINTER = prog_temp;
+	G_CURRENT_TOKEN_TYPE = token_type_temp;
+	my_strcpy_s(G_TOKEN_BUFFER, SETTINGS_ID_LEN, temp);
+
+	return index_value;
+}
+
+static int read_array_value(const array_type& array, int index_value)
+{
+	switch (array.a_type)
+	{
+	case CHAR:
+		return *((char*)array.adr + index_value);
+	case INT:
+		return *((int*)array.adr + index_value);
+	case FLOAT:
+		return (int)(*((float*)array.adr + index_value));
+	case DOUBLE:
+		return (int)(*((double*)array.adr + index_value));
+	}
+
+	sntx_err(SYNTAX);
+	return 0;
+}
+
+static void write_array_value(array_type& array, int index_value, int value)
+{
+	switch (array.a_type)
+	{
+	case CHAR:
+		*((char*)array.adr + index_value) = (char)value;
+		return;
+	case INT:
+		*((int*)array.adr + index_value) = value;
+		return;
+	case FLOAT:
+		*((float*)array.adr + index_value) = (float)value;
+		return;
+	case DOUBLE:
+		*((double*)array.adr + index_value) = (double)value;
+		return;
+	}
+
+	sntx_err(SYNTAX);
+}
+
+// –î–û–ë–ê–í–ò–¢–¨ - –ò–ó–ú–ï–ù–ò–¢–¨ - –ù–ï –¢–û–õ–¨–ö–û INT
+/* –í—Ö–æ–¥ –≤ –ø–∞—Ä—Å–µ—Ä.*/
 void eval_exp(int* value, int get_token_)
 {
 	if (get_token_)
@@ -24,15 +89,15 @@ void eval_exp(int* value, int get_token_)
 		return;
 	}
 	if (*G_TOKEN_BUFFER == ';') {
-		*value = 0; /* ÔÛÒÚÓÂ ‚˚‡ÊÂÌËÂ (ÓÔÂ‡ÚÓ) */
+		*value = 0; /* –ø—É—Å—Ç–æ–µ –≤—ã—Ä–∞–∂–µ–Ω–∏–µ (–æ–ø–µ—Ä–∞—Ç–æ—Ä) */
 		return;
 	}
 	eval_exp0(value);
-	putback(); /* ‚ÓÁ‚‡˘‡ÂÚ ÔÓÒÎÂ‰ÌËÈ Ò˜ËÚ‡ÌÌ˚È ÚÓÍÂÌ ‚ ÔÓÚÓÍ ‚‚Ó‰‡ */
+	putback(); /* –≤–æ–∑–≤—Ä–∞—â–∞–µ—Ç –ø–æ—Å–ª–µ–¥–Ω–∏–π —Å—á–∏—Ç–∞–Ω–Ω—ã–π —Ç–æ–∫–µ–Ω –≤ –ø–æ—Ç–æ–∫ –≤–≤–æ–¥–∞ */
 }
 
-// »«Ã≈Õ»“‹ ƒ≈—‹ - ƒŒ¡¿¬»“‹ Œ¡–¿¡Œ“ ” Ã¿——»¬Œ¬
-/* Œ·‡·ÓÚÍ‡ ÔËÒ‚‡Ë‚‡ÌËˇ */
+// –ò–ó–ú–ï–ù–ò–¢–¨ –î–ï–°–¨ - –î–û–ë–ê–í–ò–¢–¨ –û–ë–†–ê–ë–û–¢–ö–£ –ú–ê–°–°–ò–í–û–í
+/* –û–±—Ä–∞–±–æ—Ç–∫–∞ –ø—Ä–∏—Å–≤–∞–∏–≤–∞–Ω–∏—è */
 void eval_exp0(int* value)
 {
 	char temp[SETTINGS_ID_LEN];  /* holds name of var receiving
@@ -79,7 +144,7 @@ void eval_exp0(int* value)
 	eval_exp1(value);
 }
 
-/* Ó·‡·ÓÚÍ‡ ÛÒÎÓ‚Ì˚ı ÓÔÂ‡ÚÓÓ‚. */
+/* –æ–±—Ä–∞–±–æ—Ç–∫–∞ —É—Å–ª–æ–≤–Ω—ã—Ö –æ–ø–µ—Ä–∞—Ç–æ—Ä–æ–≤. */
 void eval_exp1(int* value)
 {
 	int partial_value;
@@ -116,7 +181,7 @@ void eval_exp1(int* value)
 	}
 }
 
-/*  —ÎÓÊÂÌËÂ Ë ‚˚˜ËÚ‡ÌËÂ. */
+/*  –°–ª–æ–∂–µ–Ω–∏–µ –∏ –≤—ã—á–∏—Ç–∞–Ω–∏–µ. */
 void eval_exp2(int* value)
 {
 	char  op;
@@ -137,7 +202,7 @@ void eval_exp2(int* value)
 	}
 }
 
-/* ”ÏÌÓÊÂÌËÂ Ë ‰ÂÎÂÌËÂ. */
+/* –£–º–Ω–æ–∂–µ–Ω–∏–µ –∏ –¥–µ–ª–µ–Ω–∏–µ. */
 void eval_exp3(int* value)
 {
 	char  op;
@@ -163,7 +228,7 @@ void eval_exp3(int* value)
 	}
 }
 
-/* ”Ì‡Ì˚È + ËÎË -. */
+/* –£–Ω–∞—Ä–Ω—ã–π + –∏–ª–∏ -. */
 void eval_exp4(int* value)
 {
 	char  op;
@@ -178,7 +243,7 @@ void eval_exp4(int* value)
 		if (op == '-') *value = -(*value);
 }
 
-/* Œ·‡·ÓÚÍ‡ ‚˚‡ÊÂÌËÈ ‚ ÒÍÓ·Í‡ı. */
+/* –û–±—Ä–∞–±–æ—Ç–∫–∞ –≤—ã—Ä–∞–∂–µ–Ω–∏–π –≤ —Å–∫–æ–±–∫–∞—Ö. */
 void eval_exp5(int* value)
 {
 	if (*G_TOKEN_BUFFER == '(') {
@@ -191,7 +256,7 @@ void eval_exp5(int* value)
 		atom(value);
 }
 
-/* ÓÔÂ‰ÂÎˇÂÚÒˇ ÁÌ‡˜ÂÌËÂ ˜ËÒÎ‡, ÔÂÂÏÌÓÓÈ, ˝ÎÂÏÂÌÚ‡ Ï‡ÒÒË‚‡ ËÎË ˚ÁÓ‚‡ ÙÛÌÍˆËË. */
+/* –æ–ø—Ä–µ–¥–µ–ª—è–µ—Ç—Å—è –∑–Ω–∞—á–µ–Ω–∏–µ —á–∏—Å–ª–∞, –ø–µ—Ä–µ–º–Ω–æ–æ–π, —ç–ª–µ–º–µ–Ω—Ç–∞ –º–∞—Å—Å–∏–≤–∞ –∏–ª–∏ —ã–∑–æ–≤–∞ —Ñ—É–Ω–∫—Ü–∏–∏. */
 void atom(int* value)
 {
 	int i;
@@ -259,7 +324,7 @@ int internal_func(char* s)
 
 
 
-// »«Ã≈Õ»À - ƒŒ–¿¡Œ“¿“‹ - VALUE “ŒÀ‹ Œ INT
+// –ò–ó–ú–ï–ù–ò–õ - –î–û–†–ê–ë–û–¢–ê–¢–¨ - VALUE –¢–û–õ–¨–ö–û INT
 void assign_var_array(char* var_name, int value, int is_array, char* array_index)
 {
 	if (!is_array)
@@ -268,58 +333,34 @@ void assign_var_array(char* var_name, int value, int is_array, char* array_index
 		assign_array(var_name, value, array_index);
 }
 
-// ƒŒ¡¿¬»À
+// –î–û–ë–ê–í–ò–õ
 int find_array(char* name, char* index)
 {
 	int i;
-	int* ip;
-	char* cp;
-	float* fp;
-	double* dp;
-	int adr_to_file;
+	int index_value;
 
 	for (i = G_STACK_TOP_FOR_LOCAL_ARRAYS - 1; i >= G_CALL_STACK[functos - 1].arrays; i--) {
 		if (!strcmp(G_STACK_FOR_LOCAL_ARRAYS[i].array_name, name)) {
-			int index_value, token_type_temp;
-			char temp[SETTINGS_ID_LEN + 1];
-			my_strcpy_s(temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
-			my_strcpy_s(G_TOKEN_BUFFER, SETTINGS_ID_LEN, index);
-			token_type_temp = G_CURRENT_TOKEN_TYPE;
-			G_CURRENT_TOKEN_TYPE = IDENTIFIER;
-			char* prog_temp = G_PROGRAM_POINTER;
-			G_PROGRAM_POINTER = index;
-			char* p_zero = strchr(G_PROGRAM_POINTER, '\0');
-			*p_zero++ = ';';
-			*p_zero = '\0';
-			eval_exp(&index_value, 1);
-			G_PROGRAM_POINTER = prog_temp;
-			G_CURRENT_TOKEN_TYPE = token_type_temp;
-			my_strcpy_s(G_TOKEN_BUFFER, SETTINGS_ID_LEN, temp);
+			index_value = eval_array_index_expression(index);
 #ifdef SIMULATOR
-			/* ◊“≈Õ»≈*/
-			cache.trace_handler((local_array_stack[i].start_address + index_value * local_array_stack[i].sizeofop), local_array_stack[i].array_name, "r", "");
+			cache.trace_handler((G_STACK_FOR_LOCAL_ARRAYS[i].start_address + index_value * G_STACK_FOR_LOCAL_ARRAYS[i].sizeofop), G_STACK_FOR_LOCAL_ARRAYS[i].array_name, "r", "");
 #endif
-			switch (G_STACK_FOR_LOCAL_ARRAYS[i].a_type)
-			{
-			case CHAR:
-				cp = (char*)G_STACK_FOR_LOCAL_ARRAYS[i].adr;
-				return *(cp + index_value);
-				break;
-			case INT:
-				ip = (int*)G_STACK_FOR_LOCAL_ARRAYS[i].adr;
-				return *(ip + index_value);
-				break;
-			case FLOAT:
-				fp = (float*)G_STACK_FOR_LOCAL_ARRAYS[i].adr;
-				return *(fp + index_value);
-				break;
-			case DOUBLE:
-				dp = (double*)G_STACK_FOR_LOCAL_ARRAYS[i].adr;
-				return *(dp + index_value);
-				break;
-			}
+			return read_array_value(G_STACK_FOR_LOCAL_ARRAYS[i], index_value);
 		}
 	}
+
+	for (i = 0; i < G_ARRAY_INDEX; i++) {
+		if (!strcmp(global_arrays[i].array_name, name)) {
+			index_value = eval_array_index_expression(index);
+#ifdef SIMULATOR
+			cache.trace_handler((global_arrays[i].start_address + index_value * global_arrays[i].sizeofop), global_arrays[i].array_name, "r", "");
+#endif
+			return read_array_value(global_arrays[i], index_value);
+		}
+	}
+
+	sntx_err(NOT_VAR);
+	return -1;
 }
 
 /* Find the value of a variable. */
@@ -329,11 +370,11 @@ int find_var(char* s)
 
 	/* first, see if it's a local variable */
 	for (i = G_STACK_TOP_FOR_LOCAL_VARS - 1; i >= G_CALL_STACK[functos - 1].vars; i--)
-		if (!strcmp(G_STACK_FOR_LOCAL_VARS[i].var_name, G_TOKEN_BUFFER))
+		if (!strcmp(G_STACK_FOR_LOCAL_VARS[i].var_name, s))
 			return G_STACK_FOR_LOCAL_VARS[i].value;
 
 	/* otherwise, try global vars */
-	for (i = 0; i < SETTINGS_NUM_GLOBAL_VARS; i++)
+	for (i = 0; i < G_VAR_INDEX; i++)
 		if (!strcmp(global_vars[i].var_name, s))
 			return global_vars[i].value;
 
@@ -372,7 +413,7 @@ void call(void)
 	else {
 		stack_top_for_locacl_vars = G_STACK_TOP_FOR_LOCAL_VARS;  /* save local var stack index */
 		stack_top_for_local_arrays = G_STACK_TOP_FOR_LOCAL_ARRAYS;
-		// Õ≈ !!! ƒŒ¡¿¬»À œ≈–≈ƒ¿◊” œ¿–¿Ã≈“–Œ¬
+		// –ù–ï !!! –î–û–ë–ê–í–ò–õ –ü–ï–†–ï–î–ê–ß–£ –ü–ê–†–ê–ú–ï–¢–†–û–í
 		get_args();  /* get function arguments */
 		temp = G_PROGRAM_POINTER; /* save return location */
 		func_push(stack_top_for_locacl_vars, stack_top_for_local_arrays);  /* save local var stack index */
@@ -681,7 +722,7 @@ void sntx_err(int error)
 	longjmp(e_buf, 1); /* return to safe point */
 }
 
-/* Return a token to input stream. */  // ‚ÓÁ‚‡˘‡ÂÏ ÛÍ‡Á‡ÚÂÎ¸ ÔÓ G_PROGRAM_POINTER ‚ Ì‡˜‡ÎÓ ÔÓÒÎÂ‰ÌÂ„Ó ‡ÒÔ‡¯ÂÌÌÓ„Ó ÚÓÍÂÌ‡
+/* Return a token to input stream. */  // –≤–æ–∑–≤—Ä–∞—â–∞–µ–º —É–∫–∞–∑–∞—Ç–µ–ª—å –ø–æ G_PROGRAM_POINTER –≤ –Ω–∞—á–∞–ª–æ –ø–æ—Å–ª–µ–¥–Ω–µ–≥–æ —Ä–∞—Å–ø–∞—Ä—à–µ–Ω–Ω–æ–≥–æ —Ç–æ–∫–µ–Ω–∞
 void putback(void)
 {
 	char* t;
@@ -711,8 +752,8 @@ void extract_array_name_index(const char* name, const char* size, const char* to
 	my_strcpy_s((char*)size, SETTINGS_ID_LEN, array_name_size);
 }
 
-/* œÓ‚ÂˇÂÚ, ˇ‚ÎˇÂÚÒˇ ÎË Ë‰ÂÌÚËÙËÍ‡ÚÓ ÔÂÂÏÂÌÌÓÈ. ¬Ó‚Á‡˘‡ÂÚ 1 ÂÒÎË ˇ‚ÎˇÂÚÒˇ
-Ë 0 ‚ ÔÓÚË‚ÌÓÏ ÒÎÛ˜‡Â*/
+/* –ü—Ä–æ–≤–µ—Ä—è–µ—Ç, —è–≤–ª—è–µ—Ç—Å—è –ª–∏ –∏–¥–µ–Ω—Ç–∏—Ñ–∏–∫–∞—Ç–æ—Ä –ø–µ—Ä–µ–º–µ–Ω–Ω–æ–π. –í–æ–≤–∑—Ä–∞—â–∞–µ—Ç 1 –µ—Å–ª–∏ —è–≤–ª—è–µ—Ç—Å—è
+–∏ 0 –≤ –ø—Ä–æ—Ç–∏–≤–Ω–æ–º —Å–ª—É—á–∞–µ*/
 int is_var(char* s)
 {
 	int i;
@@ -723,13 +764,13 @@ int is_var(char* s)
 			return 1;
 
 	/* otherwise, try global vars */
-	for (i = 0; i < SETTINGS_NUM_GLOBAL_VARS; i++)
+	for (i = 0; i < G_VAR_INDEX; i++)
 		if (!strcmp(global_vars[i].var_name, s))
 			return 1;
 
 	return 0;
 }
-// ƒŒ¡¿¬»À ÚÓ ÊÂ Ò‡ÏÓÂ ‰Îˇ Ï‡ÒÒË‚‡
+// –î–û–ë–ê–í–ò–õ —Ç–æ –∂–µ —Å–∞–º–æ–µ –¥–ª—è –º–∞—Å—Å–∏–≤–∞
 int is_array(char* s)
 {
 	int i;
@@ -747,85 +788,36 @@ int is_array(char* s)
 	return 0;
 }
 
-//ƒŒ¡¿¬»À
-/* œËÒ‚‡Ë‚‡ÂÚ ÁÌ‡˜ÂÌËÂ ˝ÎÂÏÌÂÚÛ Ï‡ÒÒË‚‡. */
+//–î–û–ë–ê–í–ò–õ
+/* –ü—Ä–∏—Å–≤–∞–∏–≤–∞–µ—Ç –∑–Ω–∞—á–µ–Ω–∏–µ —ç–ª–µ–º–Ω–µ—Ç—É –º–∞—Å—Å–∏–≤–∞. */
 void assign_array(char* array_name, int value, char* index)
 {
 	int i;
-	int* ip;
-	char* cp;
-	float* fp;
-	double* dp;
-
-	int i_debug;
-	int* ip_debug;
-
-	int com = strcmp(array_name, "c");
+	int index_value;
 
 	for (i = G_STACK_TOP_FOR_LOCAL_ARRAYS - 1; i >= G_CALL_STACK[functos - 1].arrays; i--) {
 		if (!strcmp(G_STACK_FOR_LOCAL_ARRAYS[i].array_name, array_name)) {
-
-			//printf("Found - %s\n", array_name);
-			//i_debug = i;
-
-			//////////////   ƒŒ¡¿¬»“‹ “”“   int index = 5;
-			int index_value, token_type_temp;
-			char temp[SETTINGS_ID_LEN + 1];
-			my_strcpy_s(temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
-			my_strcpy_s(G_TOKEN_BUFFER, SETTINGS_ID_LEN, index);
-			token_type_temp = G_CURRENT_TOKEN_TYPE;
-			G_CURRENT_TOKEN_TYPE = IDENTIFIER;
-
-			char* prog_temp = G_PROGRAM_POINTER;
-			G_PROGRAM_POINTER = index;
-			char* p_zero = strchr(G_PROGRAM_POINTER, '\0');
-			*p_zero++ = ';';
-			*p_zero = '\0';
-
-
-			eval_exp(&index_value, 1);
-
-			//if (!com)
-			//	printf("DEBUG - array=%s index=%d\n", local_array_stack[i].array_name, index_value);
-
-			//printf("Index - %d, value - %d\n", index_value, value);
-
-			G_PROGRAM_POINTER = prog_temp;
-			G_CURRENT_TOKEN_TYPE = token_type_temp;
-			my_strcpy_s(G_TOKEN_BUFFER, SETTINGS_ID_LEN, temp);
+			index_value = eval_array_index_expression(index);
 #ifdef SIMULATOR
-			/* «¿œ»—‹*/
-			cache.trace_handler((local_array_stack[i].start_address + index_value * local_array_stack[i].sizeofop), local_array_stack[i].array_name, "w", "");
+			cache.trace_handler((G_STACK_FOR_LOCAL_ARRAYS[i].start_address + index_value * G_STACK_FOR_LOCAL_ARRAYS[i].sizeofop), G_STACK_FOR_LOCAL_ARRAYS[i].array_name, "w", "");
 #endif
-
-			switch (G_STACK_FOR_LOCAL_ARRAYS[i].a_type)
-			{
-			case CHAR:
-				cp = (char*)G_STACK_FOR_LOCAL_ARRAYS[i].adr;
-				*(cp + index_value) = (char)value;
-				break;
-			case INT:
-				ip = (int*)G_STACK_FOR_LOCAL_ARRAYS[i].adr;
-				*(ip + index_value) = (int)value;
-				break;
-			case FLOAT:
-				fp = (float*)G_STACK_FOR_LOCAL_ARRAYS[i].adr;
-				*(fp + index_value) = (float)value;
-				break;
-			case DOUBLE:
-				dp = (double*)G_STACK_FOR_LOCAL_ARRAYS[i].adr;
-				*(dp + index_value) = (double)value;
-				break;
-			}
-
-			//ip_debug = (int*)local_array_stack[i_debug].adr;
-			//printf("Value - %d\n",  * (ip + index_value));
-
+			write_array_value(G_STACK_FOR_LOCAL_ARRAYS[i], index_value, value);
 			return;
 		}
 	}
 
-	// ƒŒ¡¿¬»“‹  - ﬂ “”“ Õ≈ œŒ»— ¿À ¬ √ÀŒ¡¿À‹Õ€’ Ã¿——»¬¿’
+	for (i = 0; i < G_ARRAY_INDEX; i++) {
+		if (!strcmp(global_arrays[i].array_name, array_name)) {
+			index_value = eval_array_index_expression(index);
+#ifdef SIMULATOR
+			cache.trace_handler((global_arrays[i].start_address + index_value * global_arrays[i].sizeofop), global_arrays[i].array_name, "w", "");
+#endif
+			write_array_value(global_arrays[i], index_value, value);
+			return;
+		}
+	}
+
+	sntx_err(NOT_VAR);
 }
 
 /* Assign a value to a variable. */
@@ -842,7 +834,7 @@ void assign_var(char* var_name, int value)
 	}
 	if (i < G_CALL_STACK[functos - 1].vars)
 		/* if not local, try global var table */
-		for (i = 0; i < SETTINGS_NUM_GLOBAL_VARS; i++)
+		for (i = 0; i < G_VAR_INDEX; i++)
 			if (!strcmp(global_vars[i].var_name, var_name)) {
 				global_vars[i].value = value;
 				return;

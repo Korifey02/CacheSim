@@ -17,12 +17,11 @@ using namespace std;
 
 char* G_PROGRAM_POINTER = nullptr;
 jmp_buf e_buf;
-struct var_type global_vars[SETTINGS_NUM_GLOBAL_VARS];
-struct array_type global_arrays[SETTINGS_NUM_GLOBAL_ARRAYS];
+struct var_type G_GLOBAL_VARS_STORAGE[SETTINGS_NUM_GLOBAL_VARS];
+struct array_type G_GLOBAL_ARRAYS_STORAGE[SETTINGS_NUM_GLOBAL_ARRAYS];
 struct var_type G_STACK_FOR_LOCAL_VARS[SETTINGS_NUM_LOCAL_VARS];
 struct array_type G_STACK_FOR_LOCAL_ARRAYS[SETTINGS_NUM_LOCAL_ARRAYS];
 struct func_type G_FUNC_TABLE[SETTINGS_NUM_FUNC];
-struct func_type func_stack[SETTINGS_NUM_FUNC];
 struct var_array_stack G_CALL_STACK[SETTINGS_NUM_FUNC];
 char G_TOKEN_BUFFER[SETTINGS_MAX_TOKEN_LENGTH]; // одна переменная-буфер для одного текущего токена
 char G_CURRENT_TOKEN_TYPE = 0;
@@ -110,8 +109,6 @@ int entry_interp(int argc, char* argv[])
 	// ДОБАВИЛ
 	// То же для локальных массивов
 	G_STACK_TOP_FOR_LOCAL_ARRAYS = 0;     /* initialize local массивы stack index */
-	// Виртуальный адрес для симулятора кэша — с какого адреса выделять следующий массив
-	//
 	// Глубина стека вызовов функций
 	functos = 0;     /* initialize the CALL stack index */
 	// Флаг что встретился break — сейчас не активен
@@ -423,12 +420,12 @@ void decl_global(void) // todo с ней пока не раскуриливал
 		if (pos = strchr(token_temp, '['))
 		{
 			// МАССИВ			
-			global_arrays[G_ARRAY_INDEX].a_type = vartype;
+			G_GLOBAL_ARRAYS_STORAGE[G_ARRAY_INDEX].a_type = vartype;
 			int size, sizeofop;
-			global_arrays[G_ARRAY_INDEX].adr = extract_array_decl(global_arrays[G_ARRAY_INDEX].array_name, pos, vartype, token_temp, &size, &sizeofop);
-			global_arrays[G_ARRAY_INDEX].size = size;
-			global_arrays[G_ARRAY_INDEX].sizeofop = sizeofop;
-			global_arrays[G_ARRAY_INDEX].start_address = start_address_arrays;
+			G_GLOBAL_ARRAYS_STORAGE[G_ARRAY_INDEX].adr = extract_array_decl(G_GLOBAL_ARRAYS_STORAGE[G_ARRAY_INDEX].array_name, pos, vartype, token_temp, &size, &sizeofop);
+			G_GLOBAL_ARRAYS_STORAGE[G_ARRAY_INDEX].size = size;
+			G_GLOBAL_ARRAYS_STORAGE[G_ARRAY_INDEX].sizeofop = sizeofop;
+			G_GLOBAL_ARRAYS_STORAGE[G_ARRAY_INDEX].start_address = start_address_arrays;
 			start_address_arrays += size * sizeofop;
 			G_ARRAY_INDEX++;
 #ifdef SIMULATOR
@@ -438,9 +435,9 @@ void decl_global(void) // todo с ней пока не раскуриливал
 		else
 		{
 			// ПЕРЕМЕННАЯ
-			global_vars[G_VAR_INDEX].v_type = vartype;
-			global_vars[G_VAR_INDEX].value = 0;  /* init to 0 */
-			my_strcpy_s(global_vars[G_VAR_INDEX].var_name, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
+			G_GLOBAL_VARS_STORAGE[G_VAR_INDEX].v_type = vartype;
+			G_GLOBAL_VARS_STORAGE[G_VAR_INDEX].value = 0;  /* init to 0 */
+			my_strcpy_s(G_GLOBAL_VARS_STORAGE[G_VAR_INDEX].var_name, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
 			G_VAR_INDEX++;
 		}
 		// 

@@ -119,7 +119,7 @@ struct var_type {
 	int v_type;
 	int value;
 };
-extern struct var_type global_vars[];
+extern struct var_type G_GLOBAL_VARS_STORAGE[];
 // днаюбхк
 struct array_type {
 	char array_name[SETTINGS_ID_LEN];
@@ -129,7 +129,7 @@ struct array_type {
 	int size;
 	int start_address;
 };
-extern struct array_type global_arrays[];
+extern struct array_type G_GLOBAL_ARRAYS_STORAGE[];
 ////////////
 extern struct var_type G_STACK_FOR_LOCAL_VARS[];
 extern struct array_type G_STACK_FOR_LOCAL_ARRAYS[];
@@ -145,7 +145,6 @@ struct func_type {
 	char* loc;  /* location of entry point in file */
 };
 extern struct func_type G_FUNC_TABLE[];
-extern struct func_type func_stack[];
 
 struct intern_func_type {
 	const char* f_name; /* function name */

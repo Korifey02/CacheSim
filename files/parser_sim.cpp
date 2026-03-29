@@ -347,9 +347,9 @@ void find_array_sim(char* name, char* index)
 	}
 
 	for (int i = 0; i < G_ARRAY_INDEX; i++) {
-		if (!strcmp(global_arrays[i].array_name, name)) {
+		if (!strcmp(G_GLOBAL_ARRAYS_STORAGE[i].array_name, name)) {
 			int index_value = eval_array_index_expression_sim(index);
-			cache.trace_handler((global_arrays[i].start_address + index_value * global_arrays[i].sizeofop), global_arrays[i].array_name, "r", "");
+			cache.trace_handler((G_GLOBAL_ARRAYS_STORAGE[i].start_address + index_value * G_GLOBAL_ARRAYS_STORAGE[i].sizeofop), G_GLOBAL_ARRAYS_STORAGE[i].array_name, "r", "");
 			return;
 		}
 	}
@@ -369,9 +369,9 @@ void assign_array_sim(char* array_name, char* index)
 	}
 
 	for (int i = 0; i < G_ARRAY_INDEX; i++) {
-		if (!strcmp(global_arrays[i].array_name, array_name)) {
+		if (!strcmp(G_GLOBAL_ARRAYS_STORAGE[i].array_name, array_name)) {
 			int index_value = eval_array_index_expression_sim(index);
-			cache.trace_handler((global_arrays[i].start_address + index_value * global_arrays[i].sizeofop), global_arrays[i].array_name, "w", "");
+			cache.trace_handler((G_GLOBAL_ARRAYS_STORAGE[i].start_address + index_value * G_GLOBAL_ARRAYS_STORAGE[i].sizeofop), G_GLOBAL_ARRAYS_STORAGE[i].array_name, "w", "");
 			return;
 		}
 	}

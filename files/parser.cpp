@@ -350,12 +350,12 @@ int find_array(char* name, char* index)
 	}
 
 	for (i = 0; i < G_ARRAY_INDEX; i++) {
-		if (!strcmp(global_arrays[i].array_name, name)) {
+		if (!strcmp(G_GLOBAL_ARRAYS_STORAGE[i].array_name, name)) {
 			index_value = eval_array_index_expression(index);
 #ifdef SIMULATOR
 			cache.trace_handler((global_arrays[i].start_address + index_value * global_arrays[i].sizeofop), global_arrays[i].array_name, "r", "");
 #endif
-			return read_array_value(global_arrays[i], index_value);
+			return read_array_value(G_GLOBAL_ARRAYS_STORAGE[i], index_value);
 		}
 	}
 
@@ -375,8 +375,8 @@ int find_var(char* s)
 
 	/* otherwise, try global vars */
 	for (i = 0; i < G_VAR_INDEX; i++)
-		if (!strcmp(global_vars[i].var_name, s))
-			return global_vars[i].value;
+		if (!strcmp(G_GLOBAL_VARS_STORAGE[i].var_name, s))
+			return G_GLOBAL_VARS_STORAGE[i].value;
 
 	sntx_err(NOT_VAR); /* variable not found */
 	return -1;
@@ -765,7 +765,7 @@ int is_var(char* s)
 
 	/* otherwise, try global vars */
 	for (i = 0; i < G_VAR_INDEX; i++)
-		if (!strcmp(global_vars[i].var_name, s))
+		if (!strcmp(G_GLOBAL_VARS_STORAGE[i].var_name, s))
 			return 1;
 
 	return 0;
@@ -782,7 +782,7 @@ int is_array(char* s)
 
 	/* otherwise, try global arrays */
 	for (i = 0; i < SETTINGS_NUM_GLOBAL_ARRAYS; i++)
-		if (!strcmp(global_arrays[i].array_name, s))
+		if (!strcmp(G_GLOBAL_ARRAYS_STORAGE[i].array_name, s))
 			return 1;
 
 	return 0;
@@ -807,12 +807,12 @@ void assign_array(char* array_name, int value, char* index)
 	}
 
 	for (i = 0; i < G_ARRAY_INDEX; i++) {
-		if (!strcmp(global_arrays[i].array_name, array_name)) {
+		if (!strcmp(G_GLOBAL_ARRAYS_STORAGE[i].array_name, array_name)) {
 			index_value = eval_array_index_expression(index);
 #ifdef SIMULATOR
 			cache.trace_handler((global_arrays[i].start_address + index_value * global_arrays[i].sizeofop), global_arrays[i].array_name, "w", "");
 #endif
-			write_array_value(global_arrays[i], index_value, value);
+			write_array_value(G_GLOBAL_ARRAYS_STORAGE[i], index_value, value);
 			return;
 		}
 	}
@@ -835,8 +835,8 @@ void assign_var(char* var_name, int value)
 	if (i < G_CALL_STACK[functos - 1].vars)
 		/* if not local, try global var table */
 		for (i = 0; i < G_VAR_INDEX; i++)
-			if (!strcmp(global_vars[i].var_name, var_name)) {
-				global_vars[i].value = value;
+			if (!strcmp(G_GLOBAL_VARS_STORAGE[i].var_name, var_name)) {
+				G_GLOBAL_VARS_STORAGE[i].value = value;
 				return;
 			}
 	sntx_err(NOT_VAR); /* variable not found */

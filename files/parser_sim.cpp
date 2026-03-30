@@ -134,7 +134,7 @@ void eval_exp0_sim()
 {
 	char temp[SETTINGS_ID_LEN];  /* holds name of var receiving
 						   the assignment */
-	char temp_tok;
+	char temp_token_type;
 	bool is_array_token = false;
 
 	if (G_CURRENT_TOKEN_TYPE == IDENTIFIER) {
@@ -154,7 +154,7 @@ void eval_exp0_sim()
 		}
 		if (is_var(G_TOKEN_BUFFER) || is_array_token) {  /* if a var, see if assignment */
 			my_strcpy_s(temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
-			temp_tok = G_CURRENT_TOKEN_TYPE;
+			temp_token_type = G_CURRENT_TOKEN_TYPE;
 			// сейчас temp - token (переменная, куда присываиваем), 
 			// is_array_token - токен является смассивом
 			// name - название массива, size - индекс			
@@ -192,7 +192,7 @@ void eval_exp0_sim()
 			else {  /* not an assignment */
 				putback();  /* restore original token */
 				my_strcpy_s(G_TOKEN_BUFFER, 80, temp);
-				G_CURRENT_TOKEN_TYPE = temp_tok;
+				G_CURRENT_TOKEN_TYPE = temp_token_type;
 			}
 		}
 	}

@@ -149,7 +149,29 @@ void interp_block(void)
 
 		/* see what kind of token is up */
 		if (G_CURRENT_TOKEN_TYPE == IDENTIFIER) {
+			bool use_fast_sim_statement = false;
 			in_operator = 1;
+			if (in_cycle) {
+				char name_local[SETTINGS_ID_LEN + 1] = { 0 };
+				char size_local[SETTINGS_ID_LEN + 1] = { 0 };
+				char token_temp[SETTINGS_ID_LEN + 1] = { 0 };
+				my_strcpy_s(token_temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
+
+#ifdef NUMBER_OPERATORS
+				if (token_temp[0] == 'o' && isdigit((unsigned char)token_temp[1])) {
+					use_fast_sim_statement = true;
+				}
+				else
+#endif
+				{
+					char* pos_local = strchr(token_temp, '[');
+					if (pos_local != nullptr) {
+						extract_array_name_index(name_local, size_local, token_temp, pos_local);
+						use_fast_sim_statement = ::is_array(name_local) != 0;
+					}
+				}
+			}
+
 			/* Not a keyword, so process expression. */
 			putback();  /* restore token to input stream for
 						   further processing by eval_exp() */
@@ -163,7 +185,7 @@ void interp_block(void)
 #endif
 #ifdef FAST_SIMULATOR
 				in_operator = 1;
-				if (not_rekurs_eval_exp0_sim && first_iter)
+				if (use_fast_sim_statement && not_rekurs_eval_exp0_sim && first_iter)
 				{
 #ifdef NUMBER_OPERATORS
 					//get_token();
@@ -186,7 +208,7 @@ void interp_block(void)
 							// значит только циклы
 			}
 #endif
-			if (in_cycle)
+			if (use_fast_sim_statement)
 			{
 				if (first_iter)
 					eval_exp_sim();
@@ -206,16 +228,16 @@ void interp_block(void)
 #endif
 #ifdef FAST_SIMULATOR
 				in_operator = 0;
-				//printf("%s\n", oper[oper_num]);
-				//printf("%s\n", oper_plan[oper_num]);
+				if (use_fast_sim_statement) {
 #ifdef NUMBER_OPERATORS
-				// помечаем оператор
-				* operator_start++ = 'o';
-				 snprintf(operator_start, 10, "%d; ", oper_num);
-				//_itoa(oper_num, operator_start, 10);
+					// ???????????????? ????????????????
+					* operator_start++ = 'o';
+					 snprintf(operator_start, 10, "%d; ", oper_num);
+					//_itoa(oper_num, operator_start, 10);
 #endif
-				oper_num++;
-				index_in_oper_plan = 0;			
+					oper_num++;
+					index_in_oper_plan = 0;
+				}
 #endif
 #ifdef FAST_SIMULATOR		// ПОКА "быстрая" СИМУЛЯЦИЯ только в это мрежиме
 							// значит только циклы	
@@ -727,15 +749,15 @@ void find_eob(void)
 /* Execute a for loop. */
 void exec_for(void)
 {
-	int cond;
-	char* temp, * temp2;
-	int brace;
+	int loop_condition_value;
+	char* condition_pos_pointer, * increment_pos_pointer;
+	int opened_brace_counter;
 
 	if (!in_cycle)
 	{
 		/// !!!!!!!!!!!!!!!!!
 		/// Здесь устанавливаем переменуую "первая итерация цикла"
-		first_iter = 1;			// ПОКА ЭТО КОСТЫЛЬ - НЕ ОБРАБАТЫВАЮТСЯ 
+		first_iter = 1;			// ПОКА ЭТО КОСТЫЛЬ - НЕ ОБРАБАТЫВАЮТСЯ
 		// ВЛОЖЕННЫЕ ЦИКЛЫ хотя может и правльно ?
 		/// !!!!!!!!!!!!!!!!!
 		oper_num = 0;
@@ -746,25 +768,25 @@ void exec_for(void)
 	in_cycle++;
 	break_occurring = 0; /* clear the break flag */
 	get_token();
-	eval_exp(&cond, 1);  /* initialization expression */
+	eval_exp(&loop_condition_value, 1);  /* initialization expression */
 	if (*G_TOKEN_BUFFER != ';') sntx_err(SEMI_EXPECTED);
 	G_PROGRAM_POINTER++; /* get past the ; */
-	temp = G_PROGRAM_POINTER;
+	condition_pos_pointer = G_PROGRAM_POINTER;
 	for (;;) {
-		eval_exp(&cond, 1);  /* check the condition */
+		eval_exp(&loop_condition_value, 1);  /* check the condition */
 		if (*G_TOKEN_BUFFER != ';') sntx_err(SEMI_EXPECTED);
 		G_PROGRAM_POINTER++; /* get past the ; */
-		temp2 = G_PROGRAM_POINTER;
+		increment_pos_pointer = G_PROGRAM_POINTER;
 		// НЕ !!! ДОБАВИЛ УСЛОВИЯ С МАССИВАМИ
 		/* find the start of the for block */
-		brace = 1;
-		while (brace) {
+		opened_brace_counter = 1;
+		while (opened_brace_counter) {
 			get_token();
-			if (*G_TOKEN_BUFFER == '(') brace++;
-			if (*G_TOKEN_BUFFER == ')') brace--;
+			if (*G_TOKEN_BUFFER == '(') opened_brace_counter++;
+			if (*G_TOKEN_BUFFER == ')') opened_brace_counter--;
 		}
 
-		if (cond) {
+		if (loop_condition_value) {
 			interp_block();  /* if true, interpret */
 			/// !!!!!!!!!!!!!!!!!
 			/// Здесь сбрасываем переменуую "первая итерация цикла"
@@ -797,8 +819,8 @@ void exec_for(void)
 			*/
 			return;
 		}
-		G_PROGRAM_POINTER = temp2;
-		eval_exp(&cond, 1); /* do the increment */
-		G_PROGRAM_POINTER = temp;  /* loop back to top */
+		G_PROGRAM_POINTER = increment_pos_pointer;
+		eval_exp(&loop_condition_value, 1); /* do the increment */
+		G_PROGRAM_POINTER = condition_pos_pointer;  /* loop back to top */
 	}
 }

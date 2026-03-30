@@ -1,10 +1,12 @@
 // test 1
+
+int c[10000];
+
 int main()
 {
     int i, j, k, n, l, m;
     int a[10000];
     int b[10000];
-    int c[10000];
     n = 100;
     for(i = 0; i < 10000; i=i+1) {
         a[i] = i % 6;
@@ -93,4 +95,41 @@ int main()
 //     r = sum(n);
 //
 //     return 0;
+// }
+
+
+// int a[1024];
+//
+// int main()
+// {
+//     int i;
+//
+//     for (i = 0; i < 1024; i = i + 1) {
+//         a[i] = i;
+//     }
+//
+//     for (i = 0; i < 1024; i = i + 1) {
+//         a[i] = a[i];
+//     }
+//
+//     return 0;
+// }
+
+
+// int main()
+// {
+//     int i, sum;
+//     int a[1024];
+//
+//     sum = 0;
+//
+//     for (i = 0; i < 1024; i = i + 1) {
+//         a[i] = i;
+//     }
+//
+//     for (i = 0; i < 1024; i = i + 1) {
+//         sum = sum + a[i];
+//     }
+//
+//     return sum;
 // }

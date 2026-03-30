@@ -102,7 +102,7 @@ void eval_exp0(int* value)
 {
 	char temp[SETTINGS_ID_LEN];  /* holds name of var receiving
 						   the assignment */
-	char temp_tok;
+	char temp_token_type;
 
 	if (G_CURRENT_TOKEN_TYPE == IDENTIFIER) {
 
@@ -121,7 +121,7 @@ void eval_exp0(int* value)
 			else
 				my_strcpy_s(temp, ID_LEN, name);
 				*/
-			temp_tok = G_CURRENT_TOKEN_TYPE;
+			temp_token_type = G_CURRENT_TOKEN_TYPE;
 			get_token();
 			if (*G_TOKEN_BUFFER == '=') {  /* is an assignment */
 				not_rekurs_eval_exp0_sim = 0;
@@ -137,7 +137,7 @@ void eval_exp0(int* value)
 			else {  /* not an assignment */
 				putback();  /* restore original token */
 				my_strcpy_s(G_TOKEN_BUFFER, 80, temp);
-				G_CURRENT_TOKEN_TYPE = temp_tok;
+				G_CURRENT_TOKEN_TYPE = temp_token_type;
 			}
 		}
 	}

@@ -210,7 +210,6 @@ extern std::map<std::string, int> var_values;
 
 extern std::vector<TokenInfo> g_token_stream;
 extern int g_token_pos;
-extern bool g_use_source_directly;  // for eval_array_index_expression fallback
 
 extern bool G_SIM_MODE;
 extern int not_rekurs_eval_exp0_sim;

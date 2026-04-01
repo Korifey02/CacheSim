@@ -77,7 +77,6 @@ int first_iter = 1;
 // Токенизированный поток
 std::vector<TokenInfo> g_token_stream;
 int g_token_pos = 0;
-bool g_use_source_directly = false;
 
 //std::map<std::string, std::uint32_t> arrays;
 //std::map<std::string, std::uint32_t> vars;
@@ -171,58 +170,26 @@ void interp_block(void)
 		/* see what kind of token is up */
 		if (G_CURRENT_TOKEN_TYPE == IDENTIFIER) {
 			bool use_fast_sim_statement = false;
-			int stmt_token_idx = g_token_pos - 1; /* индекс токена-идентификатора */
 			in_operator = 1;
 			if (in_cycle) {
 #ifdef FAST_SIMULATOR
-				/* На повторных итерациях: проверяем, помечен ли токен как JIT */
-				if (!first_iter && g_token_stream[stmt_token_idx].jit_op_index >= 0) {
-					use_fast_sim_statement = true;
+				// Проверяем: идентификатор + '[' = массивное выражение → SIM_MODE
+				if (g_token_pos < (int)g_token_stream.size() &&
+					g_token_stream[g_token_pos].text[0] == '[') {
+					use_fast_sim_statement = ::is_array(G_TOKEN_BUFFER) != 0;
 				}
-				else
 #endif
-				{
-					char name_local[SETTINGS_ID_LEN + 1] = { 0 };
-					char size_local[SETTINGS_ID_LEN + 1] = { 0 };
-					char token_temp[SETTINGS_ID_LEN + 1] = { 0 };
-					my_strcpy_s(token_temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
-					char* pos_local = strchr(token_temp, '[');
-					if (pos_local != nullptr) {
-						extract_array_name_index(name_local, size_local, token_temp, pos_local);
-						use_fast_sim_statement = ::is_array(name_local) != 0;
-					}
-				}
 			}
 
 			/* Not a keyword, so process expression. */
 			putback();  /* restore token to input stream for
 						   further processing by eval_exp() */
-			// !!!!!!!!!!!!!!!!!
-			// ЗДЕСЬ ДЛЯ УСКОРЕНИЯ  МОДЕЛИРВОАНИЯ НЕОБХОДИМО СДЕЛАТЬ ДРУГОЙ СТЕК eval_exp
-			// !!!!!!!!!!!!!!!!!
 #ifdef FAST_SIMULATOR
 			if (use_fast_sim_statement)
 			{
-				if (first_iter)
-				{
-					in_operator = 1;
-					G_SIM_MODE = true;
-					eval_exp(&value, 1);
-					G_SIM_MODE = false;
-				}
-				else
-				{
-					int op_idx = g_token_stream[stmt_token_idx].jit_op_index;
-					if (op_idx >= 0) {
-						eval_exp_sim_jit(op_idx);
-					} else {
-						// Оператор в условной ветке, не пройденной на первой итерации —
-						// JIT-план не записан, трассируем через sim-mode eval_exp
-						G_SIM_MODE = true;
-						eval_exp(&value, 1);
-						G_SIM_MODE = false;
-					}
-				}
+				G_SIM_MODE = true;
+				eval_exp(&value, 1);
+				G_SIM_MODE = false;
 			}
 			else
 				eval_exp(&value, 1);
@@ -230,18 +197,6 @@ void interp_block(void)
 			eval_exp(&value, 1);  /* process the expression */
 #endif
 			if (*G_TOKEN_BUFFER != ';') sntx_err(SEMI_EXPECTED);
-#ifdef FAST_SIMULATOR
-			if (in_cycle && first_iter)
-			{
-				in_operator = 0;
-				if (use_fast_sim_statement) {
-					/* Помечаем токен для JIT вместо модификации source */
-					g_token_stream[stmt_token_idx].jit_op_index = oper_num;
-					oper_num++;
-					index_in_oper_plan = 0;
-				}
-			}
-#endif
 		}
 		else if (G_CURRENT_TOKEN_TYPE == BLOCK) { /* if block delimiter */
 			if (*G_TOKEN_BUFFER == '{') /* is a block */
@@ -400,31 +355,25 @@ void prescan(void)
 */
 
 
-void* extract_array_decl(const char* name, char* pos, int vartype, char* token_temp, int* size, int* sizeofop)
+void* alloc_array_storage(int vartype, int arr_size, int* sizeofop)
 {
 	void* adr = NULL;
-	char array_name[SETTINGS_ID_LEN + 1];
-	char array_size[SETTINGS_ID_LEN + 1];
-	extract_array_name_index(array_name, array_size, token_temp, pos);
-	my_strcpy_s((char *)name, SETTINGS_ID_LEN, array_name);
-	int i = atoi(array_size);
-	*size = i;
 	switch (vartype)
 	{
 	case CHAR:
-		adr = (char*)malloc(i * sizeof(char));
+		adr = (char*)malloc(arr_size * sizeof(char));
 		*sizeofop = sizeof(char);
 		break;
 	case INT:
-		adr = (int*)malloc(i * sizeof(int));
+		adr = (int*)malloc(arr_size * sizeof(int));
 		*sizeofop = sizeof(int);
 		break;
 	case FLOAT:
-		adr = (float*)malloc(i * sizeof(float));
+		adr = (float*)malloc(arr_size * sizeof(float));
 		*sizeofop = sizeof(float);
 		break;
 	case DOUBLE:
-		adr = (double*)malloc(i * sizeof(double));
+		adr = (double*)malloc(arr_size * sizeof(double));
 		*sizeofop = sizeof(double);
 		break;
 	}
@@ -444,21 +393,29 @@ void decl_global(void) // todo с ней пока не раскуриливал
 	do { /* process comma-separated list */
 		// ДОБАВИЛ - ИЗМЕНИЛ
 		get_token();  /* get name */
-		char* pos;
-		char token_temp[SETTINGS_ID_LEN + 1];
-		my_strcpy_s(token_temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
-		if (pos = strchr(token_temp, '['))
+
+		// Проверяем: следующий токен '[' → объявление массива
+		if (g_token_pos < (int)g_token_stream.size() &&
+			g_token_stream[g_token_pos].text[0] == '[')
 		{
-			// МАССИВ			
+			// МАССИВ
 			if (G_ARRAY_INDEX >= SETTINGS_NUM_GLOBAL_ARRAYS)
 				sntx_err(TOO_MANY_GARRAYS);
 			G_GLOBAL_ARRAYS_STORAGE[G_ARRAY_INDEX].a_type = vartype;
-			int size, sizeofop;
-			G_GLOBAL_ARRAYS_STORAGE[G_ARRAY_INDEX].adr = extract_array_decl(G_GLOBAL_ARRAYS_STORAGE[G_ARRAY_INDEX].array_name, pos, vartype, token_temp, &size, &sizeofop);
-			G_GLOBAL_ARRAYS_STORAGE[G_ARRAY_INDEX].size = size;
+			my_strcpy_s(G_GLOBAL_ARRAYS_STORAGE[G_ARRAY_INDEX].array_name, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
+
+			get_token(); // consume '['
+			get_token(); // read size
+			int arr_size = atoi(G_TOKEN_BUFFER);
+			get_token(); // expect ']'
+			if (*G_TOKEN_BUFFER != ']') sntx_err(SYNTAX);
+
+			int sizeofop;
+			G_GLOBAL_ARRAYS_STORAGE[G_ARRAY_INDEX].adr = alloc_array_storage(vartype, arr_size, &sizeofop);
+			G_GLOBAL_ARRAYS_STORAGE[G_ARRAY_INDEX].size = arr_size;
 			G_GLOBAL_ARRAYS_STORAGE[G_ARRAY_INDEX].sizeofop = sizeofop;
 			G_GLOBAL_ARRAYS_STORAGE[G_ARRAY_INDEX].start_address = start_address_arrays;
-			start_address_arrays += size * sizeofop;
+			start_address_arrays += arr_size * sizeofop;
 			G_ARRAY_INDEX++;
 #ifdef SIMULATOR
 			cache.map_init_sim(global_arrays[G_ARRAY_INDEX - 1].array_name);
@@ -499,19 +456,26 @@ void decl_local(void)
 	//
 	do { /* process comma-separated list */
 		get_token(); /* get var name */
-		// ИЗМЕНИЛ
-		char* pos;
-		char token_temp[SETTINGS_ID_LEN + 1];
-		my_strcpy_s(token_temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
-		if (pos = strchr(token_temp, '['))
+
+		// Проверяем: следующий токен '[' → объявление массива
+		if (g_token_pos < (int)g_token_stream.size() &&
+			g_token_stream[g_token_pos].text[0] == '[')
 		{
 			// МАССИВ
-			int size, sizeofop;
-			a.adr = extract_array_decl(a.array_name, pos, a.a_type, token_temp, &size, &sizeofop);
-			a.size = size;
+			my_strcpy_s(a.array_name, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
+
+			get_token(); // consume '['
+			get_token(); // read size
+			int arr_size = atoi(G_TOKEN_BUFFER);
+			get_token(); // expect ']'
+			if (*G_TOKEN_BUFFER != ']') sntx_err(SYNTAX);
+
+			int sizeofop;
+			a.adr = alloc_array_storage(a.a_type, arr_size, &sizeofop);
+			a.size = arr_size;
 			a.sizeofop = sizeofop;
 			a.start_address = start_address_arrays;
-			start_address_arrays += size * sizeofop;
+			start_address_arrays += arr_size * sizeofop;
 			local_push_array(a);
 #ifdef SIMULATOR
 			cache.map_init_sim(a.array_name);

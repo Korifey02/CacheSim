@@ -340,6 +340,12 @@ int load_program(char* p, char* fname)
 		p++; i++;
 	} while (!feof(fp) && i < SETTINGS_PROG_SIZE);
 
+	if (i >= SETTINGS_PROG_SIZE && !feof(fp)) {
+		fclose(fp);
+		printf("\nprogram too large (max %d bytes)\n", SETTINGS_PROG_SIZE);
+		return 0;
+	}
+
 	if (*(p - 2) == 0x1a) *(p - 2) = '\0'; /* null terminate the program */
 	else *(p - 1) = '\0';
 	fclose(fp);
@@ -380,6 +386,8 @@ void prescan(void)
 					decl_global();
 				}
 				else if (*G_TOKEN_BUFFER == '(') {  /* must be a function */
+					if (func_index >= SETTINGS_NUM_FUNC)
+						sntx_err(TOO_MANY_FUNCS);
 					G_FUNC_TABLE[func_index].loc = G_PROGRAM_POINTER;
 					G_FUNC_TABLE[func_index].ret_type = remember_current_token;
 					my_strcpy_s(G_FUNC_TABLE[func_index].func_name, SETTINGS_ID_LEN, temp_identifier_name);
@@ -452,6 +460,8 @@ void decl_global(void) // todo с ней пока не раскуриливал
 		if (pos = strchr(token_temp, '['))
 		{
 			// МАССИВ			
+			if (G_ARRAY_INDEX >= SETTINGS_NUM_GLOBAL_ARRAYS)
+				sntx_err(TOO_MANY_GARRAYS);
 			G_GLOBAL_ARRAYS_STORAGE[G_ARRAY_INDEX].a_type = vartype;
 			int size, sizeofop;
 			G_GLOBAL_ARRAYS_STORAGE[G_ARRAY_INDEX].adr = extract_array_decl(G_GLOBAL_ARRAYS_STORAGE[G_ARRAY_INDEX].array_name, pos, vartype, token_temp, &size, &sizeofop);
@@ -467,6 +477,8 @@ void decl_global(void) // todo с ней пока не раскуриливал
 		else
 		{
 			// ПЕРЕМЕННАЯ
+			if (G_VAR_INDEX >= SETTINGS_NUM_GLOBAL_VARS)
+				sntx_err(TOO_MANY_GVARS);
 			G_GLOBAL_VARS_STORAGE[G_VAR_INDEX].v_type = vartype;
 			G_GLOBAL_VARS_STORAGE[G_VAR_INDEX].value = 0;  /* init to 0 */
 			my_strcpy_s(G_GLOBAL_VARS_STORAGE[G_VAR_INDEX].var_name, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
@@ -542,6 +554,8 @@ void get_args(void)
 	/* process a comma-separated list of values */
 	do {
 		eval_exp(&value, 1);
+		if (count >= SETTINGS_NUM_PARAMS)
+			sntx_err(TOO_MANY_PARAMS);
 		temp[count] = value;  /* save temporarily */
 		get_token();
 		count++;

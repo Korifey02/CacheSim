@@ -692,7 +692,13 @@ void sntx_err(int error)
 	  "closing quote expected",
 	  "not a string",
 	  "too many local variables",
-	  "division by zero"
+	  "too many local arrays",
+	  "division by zero",
+	  "too many global variables",
+	  "too many global arrays",
+	  "too many functions",
+	  "too many function parameters",
+	  "program too large"
 	};
 	printf("\n%s", e[error]);
 	p = p_buf;

@@ -1,0 +1,24 @@
+Cache L1
+Cache size 32 kB 8-way
+Cache line size 64
+Cache access: 500
+Cache hit: 481 (write - 281 , read - 200)
+Cache misses: 19 (write - 19 , read - 0)
+Missrate: 3.8
+Cache misses array a: 6 (write - 6 , read - 0)
+Cache misses array b: 7 (write - 7 , read - 0)
+Cache misses array c: 6 (write - 6 , read - 0)
+
+Cache L2
+Cache size 256 kB 8-way
+Cache line size 64
+Cache access: 19
+Cache hit: 0 (write - 0 , read - 0)
+Cache misses: 19 (write - 19 , read - 0)
+Missrate: 100
+Cache misses array a: 6 (write - 6 , read - 0)
+Cache misses array b: 7 (write - 7 , read - 0)
+Cache misses array c: 6 (write - 6 , read - 0)
+
+Memory reads: 19
+Memory writes: 19

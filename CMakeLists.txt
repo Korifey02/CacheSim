@@ -4,10 +4,12 @@ project(CacheSim)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Автоматически собрать список всех .cpp файлов из папки files/
+# РђРІС‚РѕРјР°С‚РёС‡РµСЃРєРё СЃРѕР±СЂР°С‚СЊ СЃРїРёСЃРѕРє РІСЃРµС… .cpp С„Р°Р№Р»РѕРІ РёР· РїР°РїРєРё files/
 file(GLOB SOURCES "files/*.cpp")
 
 add_executable(CacheSim ${SOURCES})
 
-# Чтобы компилятор находил заголовочные .h файлы из папки files/
+# Р§С‚РѕР±С‹ РєРѕРјРїРёР»СЏС‚РѕСЂ РЅР°С…РѕРґРёР» Р·Р°РіРѕР»РѕРІРѕС‡РЅС‹Рµ .h С„Р°Р№Р»С‹ РёР· РїР°РїРєРё files/
 target_include_directories(CacheSim PRIVATE files)
+
+target_link_options(CacheSim PRIVATE -static-libgcc -static-libstdc++ -static)

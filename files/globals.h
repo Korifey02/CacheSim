@@ -1,6 +1,5 @@
 #pragma once
-#include <csetjmp>
-#include <csetjmp>
+#include <stdexcept>
 #include <fstream>
 #include<map>
 #include <cstdint>
@@ -11,14 +10,14 @@
 
 using namespace std;
 
-//#define UNIX		// Для компиляции в Unix
+//#define UNIX		// пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ Unix
 
-//#define SIMULATOR	// Для "долгой" симуляции совместно с полной интерпретацией
+//#define SIMULATOR	// пїЅпїЅпїЅ "пїЅпїЅпїЅпїЅпїЅпїЅ" пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 #ifndef SIMULATOR
-#define FAST_SIMULATOR  // Для "быстрой" симуляции без полноценногой интерпретации
+#define FAST_SIMULATOR  // пїЅпїЅпїЅ "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ" пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 #endif
 #ifdef FAST_SIMULATOR
-#define NUMBER_OPERATORS  // нумеруем операторы и ищем их по номеру
+#define NUMBER_OPERATORS  // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
 #endif
 //#define TRACES
 
@@ -27,7 +26,7 @@ using namespace std;
 #define SETTINGS_NUM_FUNC        100
 #define SETTINGS_NUM_GLOBAL_VARS 100
 #define SETTINGS_NUM_LOCAL_VARS  200
-// ДОБАВИЛ
+// пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 #define SETTINGS_NUM_GLOBAL_ARRAYS 10
 #define SETTINGS_NUM_LOCAL_ARRAYS  20
 //
@@ -44,7 +43,7 @@ using namespace std;
 #define SETTINGS_MAX_TOKENS_IN_OPERATOR 50
 #define SETTINGS_DELIMITER_OPER_PLAN '\\'
 
-#define NEW_M   // метод выделения токенов через массивы 
+#define NEW_M   // пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ 
 
 
 
@@ -63,7 +62,7 @@ enum TokenType {
 	TEMP, // 4
 	STRING, // 5
 	BLOCK, // 6
-	ARRAY // ДОБАВИЛ // 7
+	ARRAY // пїЅпїЅпїЅпїЅпїЅпїЅпїЅ // 7
 };
 
 /* add additional C keyword tokens here */
@@ -83,7 +82,7 @@ enum Token {
 	EOL,// 12
 	FINISHED,// 13
 	END,// 14
-	// ДОБАВИЛ
+	// пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 	DOUBLE,// 15
 	FLOAT// 16
 	//
@@ -107,9 +106,16 @@ enum error_msg
 	TOO_MANY_LVARS, TOO_MANY_LARRAYS, DIV_BY_ZERO
 };
 
+// РСЃРєР»СЋС‡РµРЅРёРµ РґР»СЏ СЃРёРЅС‚Р°РєСЃРёС‡РµСЃРєРёС… РѕС€РёР±РѕРє (Р·Р°РјРµРЅР° longjmp)
+class SyntaxError : public std::runtime_error {
+public:
+	explicit SyntaxError(int error_code)
+		: std::runtime_error("syntax error"), code(error_code) {}
+	int code;
+};
+
 extern char* G_PROGRAM_POINTER;    /* current location in source code */
 extern char* p_buf;   /* points to start of program buffer */
-extern jmp_buf e_buf; /* hold environment for longjmp() */
 
 /* An array of these structures will hold the info
    associated with global variables.
@@ -120,7 +126,7 @@ struct var_type {
 	int value;
 };
 extern struct var_type G_GLOBAL_VARS_STORAGE[];
-// ДОБАВИЛ
+// пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 struct array_type {
 	char array_name[SETTINGS_ID_LEN];
 	int a_type;
@@ -157,7 +163,7 @@ struct var_array_stack {
 	int arrays;
 };
 extern struct var_array_stack G_CALL_STACK[];
-// ДОБАВИТЬ ТИПЫ
+// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ
 struct commands { /* keyword lookup table */
 	char command[20];
 	char tok;
@@ -170,18 +176,18 @@ extern char G_CURRENT_TOKEN_TYPE, G_CURRENT_TOKEN;
 extern int functos;  /* index to top of function call stack */
 extern int func_index; /* index into function table */
 extern int G_VAR_INDEX; /* index into global variable table */
-// ДОБАВИЛ
-extern int G_ARRAY_INDEX; /* index into global массивы table */
+// пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+extern int G_ARRAY_INDEX; /* index into global пїЅпїЅпїЅпїЅпїЅпїЅпїЅ table */
 //
 extern int G_STACK_TOP_FOR_LOCAL_VARS; /* index into local variable stack */
-// ДОБАВИЛ
+// пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 extern int G_STACK_TOP_FOR_LOCAL_ARRAYS; /* index into local array stack */
 //
 
 extern int ret_value; /* function return value */
 extern int ret_occurring; /* function return is occurring */
 extern int break_occurring; /* loop break is occurring */
-// ДОБАВИЛ
+// пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 extern int start_address_arrays;
 //
 extern struct var_array_stack func_pop(void);

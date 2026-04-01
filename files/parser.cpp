@@ -2,7 +2,6 @@
    which may include variables and function calls.
 */
 
-#include <csetjmp>
 #include <cmath>
 #include <cctype>
 #include <cstdlib>
@@ -719,7 +718,7 @@ void sntx_err(int error)
 	for (i = 0; i < 20 && p > p_buf && *p != '\n' && *p != '\r'; i++, p--);
 	for (i = 0; i < 30 && p <= temp; i++, p++) printf("%c", *p);
 
-	longjmp(e_buf, 1); /* return to safe point */
+	throw SyntaxError(error);
 }
 
 /* Return a token to input stream. */  // возвращаем указатель по G_PROGRAM_POINTER в начало последнего распаршенного токена

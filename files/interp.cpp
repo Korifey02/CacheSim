@@ -1,7 +1,6 @@
 //#define _CRT_SECURE_NO_WARNINGS // НУЖНО ПОТОМ БУДЕТ УБРАТЬ
 
 #include <cstdio> 
-#include <csetjmp>
 #include <cmath>
 #include <ctype.h>
 #include <cstdlib>
@@ -16,7 +15,6 @@
 using namespace std;
 
 char* G_PROGRAM_POINTER = nullptr;
-jmp_buf e_buf;
 struct var_type G_GLOBAL_VARS_STORAGE[SETTINGS_NUM_GLOBAL_VARS];
 struct array_type G_GLOBAL_ARRAYS_STORAGE[SETTINGS_NUM_GLOBAL_ARRAYS];
 struct var_type G_STACK_FOR_LOCAL_VARS[SETTINGS_NUM_LOCAL_VARS];
@@ -89,44 +87,47 @@ int entry_interp(int argc, char* argv[])
 		exit(1);
 	}
 
-	if (setjmp(e_buf)) exit(1); /* initialize long jump buffer */
+	try {
+		G_VAR_INDEX = 0;  /* initialize global variable index */
+		// ДОБАВИЛ
+		G_ARRAY_INDEX = 0;  /* initialize global массивы index */
+		//
 
-	G_VAR_INDEX = 0;  /* initialize global variable index */
-	// ДОБАВИЛ
-	G_ARRAY_INDEX = 0;  /* initialize global массивы index */
-	//
+		// Initialize virtual addresses before prescan so locals continue after globals.
+		start_address_arrays = 0;
+		//
+		/* set program pointer to start of program buffer */
+		G_PROGRAM_POINTER = p_buf;
+		prescan(); /* find the location of all functions
+					  and global variables in the program */
 
-	// Initialize virtual addresses before prescan so locals continue after globals.
-	start_address_arrays = 0;
-	//
-	/* set program pointer to start of program buffer */
-	G_PROGRAM_POINTER = p_buf;
-	prescan(); /* find the location of all functions
-				  and global variables in the program */
+		// Верхушка стека локальных переменных — сколько переменных сейчас на стеке
+		G_STACK_TOP_FOR_LOCAL_VARS = 0;     /* initialize local variable stack index */
+		// ДОБАВИЛ
+		// То же для локальных массивов
+		G_STACK_TOP_FOR_LOCAL_ARRAYS = 0;     /* initialize local массивы stack index */
+		// Глубина стека вызовов функций
+		functos = 0;     /* initialize the CALL stack index */
+		// Флаг что встретился break — сейчас не активен
+		break_occurring = 0; /* initialize the break occurring flag */
 
-	// Верхушка стека локальных переменных — сколько переменных сейчас на стеке
-	G_STACK_TOP_FOR_LOCAL_VARS = 0;     /* initialize local variable stack index */
-	// ДОБАВИЛ
-	// То же для локальных массивов
-	G_STACK_TOP_FOR_LOCAL_ARRAYS = 0;     /* initialize local массивы stack index */
-	// Глубина стека вызовов функций
-	functos = 0;     /* initialize the CALL stack index */
-	// Флаг что встретился break — сейчас не активен
-	break_occurring = 0; /* initialize the break occurring flag */
+		/* setup call to main() */
+		G_PROGRAM_POINTER = find_func((char *)"main"); /* find program starting point */
 
-	/* setup call to main() */
-	G_PROGRAM_POINTER = find_func((char *)"main"); /* find program starting point */
+		if (!G_PROGRAM_POINTER) { /* incorrect or missing main() function in program */
+			printf("main() not found.\n");
+			exit(1);
+		}
 
-	if (!G_PROGRAM_POINTER) { /* incorrect or missing main() function in program */
-		printf("main() not found.\n");
-		exit(1);
-	}
-
-	G_PROGRAM_POINTER--; /* back up to opening ( */
+		G_PROGRAM_POINTER--; /* back up to opening ( */
 		
-	my_strcpy_s(G_TOKEN_BUFFER, 80, "main");
+		my_strcpy_s(G_TOKEN_BUFFER, 80, "main");
 
-	call(); /* call main() to start interpreting */
+		call(); /* call main() to start interpreting */
+	}
+	catch (const SyntaxError&) {
+		return 1;
+	}
 
 	return 0;
 }

@@ -2,7 +2,9 @@
 #include <stdexcept>
 #include <fstream>
 #include <map>
+#include <unordered_map>
 #include <vector>
+#include <string>
 #include <cstdint>
 #include <stdint.h>
 
@@ -161,6 +163,8 @@ struct TokenInfo {
 	char text[SETTINGS_MAX_TOKEN_LENGTH];
 	char* source_pos;    // position in source (for sntx_err line counting)
 	int jit_op_index;    // FAST_SIMULATOR: JIT operator plan index, -1 if not replaced
+	int numeric_value;   // pre-computed atoi() for NUMBER tokens
+	unsigned char text_len; // strlen(text), для быстрого копирования
 };
 extern struct func_type G_FUNC_TABLE[];
 
@@ -210,6 +214,8 @@ extern std::map<std::string, int> var_values;
 
 extern std::vector<TokenInfo> g_token_stream;
 extern int g_token_pos;
+extern const TokenInfo* g_cur_tok; // указатель на текущий токен (без копирования)
+extern bool g_in_index_expr; // флаг: вычисляем индекс массива (skip assignment detection)
 
 extern bool G_SIM_MODE;
 extern int not_rekurs_eval_exp0_sim;
@@ -219,6 +225,11 @@ extern char oper[SETTINGS_MAX_OPERATORS_IN_CYCLE][SETTINGS_MAX_OPERATOR_LENGTH];
 extern int index_in_oper_plan;
 extern char oper_plan[SETTINGS_MAX_OPERATORS_IN_CYCLE][SETTINGS_MAX_OPERATOR_LENGTH];
 extern int first_iter;
+
+// Быстрый поиск переменных и массивов: имя → индекс в соответствующем массиве
+// Обновляются при local_push / local_push_array / func_pop / decl_global
+void rebuild_var_lookup();
+void rebuild_array_lookup();
 extern int tokens_read[SETTINGS_MAX_OPERATORS_IN_CYCLE];
 extern int token_read_num;
 extern int tokens_read_length[SETTINGS_MAX_OPERATORS_IN_CYCLE][SETTINGS_MAX_TOKENS_IN_OPERATOR];

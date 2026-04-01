@@ -14,7 +14,7 @@ void assign_array(char* array_name, int value, int index_value);
 void assign_var(char* var_name, int value);
 void assign_var_array(char* var_name, int value, int is_array, int index_value);
 int find_array(char* name, int index_value);
-int find_var(char* s);
+int find_var(char* s, bool* found = nullptr);
 int find_var_array(char* name, int is_array, int index_value);
 int find_func(char* name);
 void call(void);

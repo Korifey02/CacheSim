@@ -15,3 +15,7 @@ std::uint32_t find_index(struct array_type_sim* array, char* str, int32_t max_nu
 		if (!strcmp(array[i].array_name, str))
 			return i;
 }
+
+// Зарезервировано для будущей оптимизации (Phase 7 — hash-based lookup)
+void rebuild_var_lookup() {}
+void rebuild_array_lookup() {}

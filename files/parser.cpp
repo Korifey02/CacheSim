@@ -73,6 +73,12 @@ void eval_exp(int* value, int get_token_)
 /* Обработка присваивания */
 void eval_exp0(int* value)
 {
+	// В индексных выражениях assignment невозможен — пропускаем
+	if (g_in_index_expr) {
+		eval_exp1(value);
+		return;
+	}
+
 	char temp[SETTINGS_ID_LEN];  /* holds name of var receiving
 						   the assignment */
 	char temp_token_type;
@@ -112,8 +118,11 @@ void eval_exp0(int* value)
 					int index_value = 0;
 					bool saved_sim = G_SIM_MODE;
 					G_SIM_MODE = false;
+					bool saved_idx = g_in_index_expr;
+					g_in_index_expr = true;
 					get_token(); // первый токен индексного выражения
 					eval_exp0(&index_value);
+					g_in_index_expr = saved_idx;
 					G_SIM_MODE = saved_sim;
 
 					if (*G_TOKEN_BUFFER != ']') sntx_err(SYNTAX);
@@ -290,20 +299,9 @@ void atom(int* value)
 		bool is_array_access = (g_token_pos < (int)g_token_stream.size() &&
 			g_token_stream[g_token_pos].text[0] == '[');
 
-		i = internal_func(G_TOKEN_BUFFER);
-		if (i != -1) {  /* call "standard library" function */
-			if (!G_SIM_MODE)
-				*value = (*intern_func[i].p)();
-			else
-				(*intern_func[i].p)();
-		}
-		else if (find_func(G_TOKEN_BUFFER) >= 0) { /* call user-defined function */
-			call();
-			if (!G_SIM_MODE)
-				*value = ret_value;
-		}
-		else if (is_array_access)
+		if (is_array_access)
 		{
+			// Массив — сразу обрабатываем, пропускаем проверку функций
 			char arr_name[SETTINGS_ID_LEN];
 			my_strcpy_s(arr_name, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
 
@@ -313,8 +311,11 @@ void atom(int* value)
 			int index_value = 0;
 			bool saved_sim = G_SIM_MODE;
 			G_SIM_MODE = false;
+			bool saved_idx = g_in_index_expr;
+			g_in_index_expr = true;
 			get_token(); // первый токен индексного выражения
 			eval_exp0(&index_value);
+			g_in_index_expr = saved_idx;
 			G_SIM_MODE = saved_sim;
 
 			if (*G_TOKEN_BUFFER != ']') sntx_err(SYNTAX);
@@ -328,21 +329,40 @@ void atom(int* value)
 			get_token(); // advance past ']'
 			return;
 		}
+
+		// Пробуем переменную (самый частый случай в циклах)
+		bool var_found = false;
+		int var_val = find_var(G_TOKEN_BUFFER, &var_found);
+		if (var_found) {
+			if (!G_SIM_MODE)
+				*value = var_val;
+			get_token();
+			return;
+		}
+
+		// Функции — редкий путь (print, пользовательские функции)
+		i = internal_func(G_TOKEN_BUFFER);
+		if (i != -1) {  /* call "standard library" function */
+			if (!G_SIM_MODE)
+				*value = (*intern_func[i].p)();
+			else
+				(*intern_func[i].p)();
+		}
+		else if (find_func(G_TOKEN_BUFFER) >= 0) { /* call user-defined function */
+			call();
+			if (!G_SIM_MODE)
+				*value = ret_value;
+		}
 		else
 		{
-			if (G_SIM_MODE) {
-				// Переменные не моделируем в sim-режиме
-			}
-			else {
-				*value = find_var(G_TOKEN_BUFFER);
-			}
+			sntx_err(NOT_VAR);
 		}
 		get_token();
 		return;
 	}
 	case NUMBER: /* is numeric constant */
 		if (!G_SIM_MODE)
-			*value = atoi(G_TOKEN_BUFFER);
+			*value = g_cur_tok->numeric_value;
 		get_token();
 		return;
 	case DELIMITER: /* see if character constant */
@@ -417,22 +437,30 @@ int find_array(char* name, int index_value)
 	return -1;
 }
 
-/* Find the value of a variable. */
-int find_var(char* s)
+/* Find the value of a variable. 
+   При found != nullptr — «мягкий» режим: не бросает ошибку, а устанавливает *found.
+   При found == nullptr — оригинальное поведение с sntx_err. */
+int find_var(char* s, bool* found)
 {
 	int i;
 
+	if (found) *found = false;
+
 	/* first, see if it's a local variable */
 	for (i = G_STACK_TOP_FOR_LOCAL_VARS - 1; i >= G_CALL_STACK[functos - 1].vars; i--)
-		if (!strcmp(G_STACK_FOR_LOCAL_VARS[i].var_name, s))
+		if (!strcmp(G_STACK_FOR_LOCAL_VARS[i].var_name, s)) {
+			if (found) *found = true;
 			return G_STACK_FOR_LOCAL_VARS[i].value;
+		}
 
 	/* otherwise, try global vars */
 	for (i = 0; i < G_VAR_INDEX; i++)
-		if (!strcmp(G_GLOBAL_VARS_STORAGE[i].var_name, s))
+		if (!strcmp(G_GLOBAL_VARS_STORAGE[i].var_name, s)) {
+			if (found) *found = true;
 			return G_GLOBAL_VARS_STORAGE[i].value;
+		}
 
-	sntx_err(NOT_VAR); /* variable not found */
+	if (!found) sntx_err(NOT_VAR); /* variable not found */
 	return -1;
 }
 
@@ -683,6 +711,8 @@ void tokenize_source(void)
 		my_strcpy_s(tok.text, SETTINGS_MAX_TOKEN_LENGTH, G_TOKEN_BUFFER);
 		tok.source_pos = G_PROGRAM_POINTER; // позиция ПОСЛЕ токена
 		tok.jit_op_index = -1;
+		tok.numeric_value = (G_CURRENT_TOKEN_TYPE == NUMBER) ? atoi(G_TOKEN_BUFFER) : 0;
+		tok.text_len = (unsigned char)std::strlen(G_TOKEN_BUFFER);
 
 		g_token_stream.push_back(tok);
 
@@ -699,14 +729,16 @@ char get_token(void)
 		G_TOKEN_BUFFER[0] = '\0';
 		G_CURRENT_TOKEN = FINISHED;
 		G_CURRENT_TOKEN_TYPE = DELIMITER;
+		g_cur_tok = nullptr;
 		return G_CURRENT_TOKEN_TYPE;
 	}
 
-	const TokenInfo& t = g_token_stream[g_token_pos++];
-	my_strcpy_s(G_TOKEN_BUFFER, SETTINGS_MAX_TOKEN_LENGTH, t.text);
-	G_CURRENT_TOKEN_TYPE = t.token_type;
-	G_CURRENT_TOKEN = t.token;
-	G_PROGRAM_POINTER = t.source_pos; // для sntx_err
+	g_cur_tok = &g_token_stream[g_token_pos++];
+	G_CURRENT_TOKEN_TYPE = g_cur_tok->token_type;
+	G_CURRENT_TOKEN = g_cur_tok->token;
+	G_PROGRAM_POINTER = g_cur_tok->source_pos; // для sntx_err
+	// Копируем только нужное количество байт (text_len+1 вместо 80)
+	std::memcpy(G_TOKEN_BUFFER, g_cur_tok->text, g_cur_tok->text_len + 1);
 	return G_CURRENT_TOKEN_TYPE;
 }
 

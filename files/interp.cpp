@@ -77,6 +77,8 @@ int first_iter = 1;
 // Токенизированный поток
 std::vector<TokenInfo> g_token_stream;
 int g_token_pos = 0;
+const TokenInfo* g_cur_tok = nullptr;
+bool g_in_index_expr = false;
 
 //std::map<std::string, std::uint32_t> arrays;
 //std::map<std::string, std::uint32_t> vars;

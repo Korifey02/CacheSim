@@ -59,6 +59,7 @@ struct commands G_KEYWORD_TOKEN_TYPE_TABLE[] = { /* Commands must be entered low
 };
 int DEBUG_COUNTER = 0;
 int total_reads = 0;
+bool G_SIM_MODE = false;
 int not_rekurs_eval_exp0_sim = 1;
 int in_operator = 0;
 char oper_plan[SETTINGS_MAX_OPERATORS_IN_CYCLE][SETTINGS_MAX_OPERATOR_LENGTH];
@@ -221,7 +222,11 @@ void interp_block(void)
 			if (use_fast_sim_statement)
 			{
 				if (first_iter)
-					eval_exp_sim();
+				{
+					G_SIM_MODE = true;
+					eval_exp(&value, 1);
+					G_SIM_MODE = false;
+				}
 				else
 					eval_exp_sim_jit();
 			}

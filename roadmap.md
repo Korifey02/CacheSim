@@ -3,14 +3,14 @@
 ## Phase 0 — Safety & Testability Foundation
 + 0.1 Create test .c files with reference cache simulation results
 + 0.2 Replace longjmp with C++ exceptions (throw/catch)
-- 0.3 Fix memory leaks (Sim destructor, array dealloc on scope exit)
-- 0.4 Add bounds checking for fixed-size arrays
++ 0.3 Fix memory leaks (Sim destructor, array dealloc on scope exit)
++ 0.4 Add bounds checking for fixed-size arrays
 
 ## Phase 1 — Eliminate Parser Duplication
-- 1.1 Introduce EvalMode abstraction (compute values vs trace accesses)
-- 1.2 Merge parser.cpp + parser_sim.cpp into single parser with mode
-- 1.3 Delete parser_sim.cpp
-- 1.4 Remove SIMULATOR macro, make FAST_SIMULATOR runtime choice
++ 1.1 Introduce EvalMode abstraction (compute values vs trace accesses)
++ 1.2 Merge parser.cpp + parser_sim.cpp into single parser with mode
++ 1.3 Delete parser_sim.cpp
++ 1.4 Remove SIMULATOR macro, make FAST_SIMULATOR runtime choice
 
 ## Phase 2 — Lexer: Token Stream
 - 2.1 Create Token struct {type, value, line, source_pos}

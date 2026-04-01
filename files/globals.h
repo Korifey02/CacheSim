@@ -196,10 +196,9 @@ extern struct var_array_stack func_pop(void);
 extern int DEBUG_COUNTER;
 extern int total_reads;
 extern int in_cycle;
-//extern std::map<std::string, std::uint32_t> arrays;
-//extern std::map<std::string, std::uint32_t> vars;
 extern std::map<std::string, int> var_values;
 
+extern bool G_SIM_MODE;
 extern int not_rekurs_eval_exp0_sim;
 extern int in_operator;
 extern int oper_num;

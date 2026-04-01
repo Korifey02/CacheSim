@@ -37,13 +37,5 @@ int is_var(char* s);
 int is_array(char*);
 
 void eval_exp_sim_jit();
-void eval_exp_sim();
-void eval_exp0_sim();
-void eval_exp1_sim();
-void eval_exp2_sim();
-void eval_exp3_sim();
-void eval_exp4_sim();
-void eval_exp5_sim();
-void atom_sim();
 void find_array_sim(char* name, char* index);
 void assign_array_sim(char* array_name, char* index);

@@ -102,34 +102,55 @@ void eval_exp0(int* value)
 	char temp[SETTINGS_ID_LEN];  /* holds name of var receiving
 						   the assignment */
 	char temp_token_type;
+	bool is_array_token = false;
 
 	if (G_CURRENT_TOKEN_TYPE == IDENTIFIER) {
 
-		char name[SETTINGS_ID_LEN + 1];
-		char size[SETTINGS_ID_LEN + 1];
+		char name[SETTINGS_ID_LEN + 1] = { 0 };
+		char size[SETTINGS_ID_LEN + 1] = { 0 };
 		char* pos;
 		char token_temp[SETTINGS_ID_LEN + 1];
 		my_strcpy_s(token_temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
-		if (pos = strchr(token_temp, '['))
+		if (pos = strchr(token_temp, '[')) {
 			extract_array_name_index(name, size, token_temp, pos);
-		if (is_var(G_TOKEN_BUFFER) || ::is_array(name)) {  /* if a var, see if assignment */
+			is_array_token = ::is_array(name);
+		}
+		if (is_var(G_TOKEN_BUFFER) || is_array_token) {  /* if a var, see if assignment */
 			my_strcpy_s(temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
-			/*
-			if (is_var(token))
-				my_strcpy_s(temp, ID_LEN, token);
-			else
-				my_strcpy_s(temp, ID_LEN, name);
-				*/
 			temp_token_type = G_CURRENT_TOKEN_TYPE;
 			get_token();
 			if (*G_TOKEN_BUFFER == '=') {  /* is an assignment */
 				not_rekurs_eval_exp0_sim = 0;
 				get_token();
 				eval_exp0(value);  /* get value to assign */
-				if (is_var(temp))
-					assign_var_array(temp, *value, 0, 0);  /* assign the value */
-				else
-					assign_var_array(name, *value, 1, size);  /* assign the value */
+				if (G_SIM_MODE) {
+					// В sim-режиме трассируем запись массива
+					if (is_array_token) {
+						assign_array(name, 0, size);  // g_sim_mode=true → trace_handler("w")
+						if (first_iter)
+						{
+#ifdef NEW_M
+							int temp_i = strlen(temp);
+							char* pos_local = &oper_plan[oper_num][index_in_oper_plan];
+							memcpy(pos_local, temp, temp_i);
+							tokens_write_length[oper_num] = temp_i;
+#else
+							int i = 0;
+							oper_plan[oper_num][index_in_oper_plan++] = '=';
+							while (temp[i] != '\0')
+								oper_plan[oper_num][index_in_oper_plan++] = temp[i++];
+							oper_plan[oper_num][index_in_oper_plan++] = '\0';
+#endif
+						}
+					}
+					// Переменные пока не моделируем в sim-режиме
+				}
+				else {
+					if (is_var(temp))
+						assign_var_array(temp, *value, 0, 0);  /* assign the value */
+					else
+						assign_var_array(name, *value, 1, size);  /* assign the value */
+				}
 				not_rekurs_eval_exp0_sim = 1;
 				return;
 			}
@@ -157,25 +178,27 @@ void eval_exp1(int* value)
 	if (strchr(relops, op)) {
 		get_token();
 		eval_exp2(&partial_value);
-		switch (op) {  /* perform the relational operation */
-		case LT:
-			*value = *value < partial_value;
-			break;
-		case LE:
-			*value = *value <= partial_value;
-			break;
-		case GT:
-			*value = *value > partial_value;
-			break;
-		case GE:
-			*value = *value >= partial_value;
-			break;
-		case EQ:
-			*value = *value == partial_value;
-			break;
-		case NE:
-			*value = *value != partial_value;
-			break;
+		if (!G_SIM_MODE) {
+			switch (op) {  /* perform the relational operation */
+			case LT:
+				*value = *value < partial_value;
+				break;
+			case LE:
+				*value = *value <= partial_value;
+				break;
+			case GT:
+				*value = *value > partial_value;
+				break;
+			case GE:
+				*value = *value >= partial_value;
+				break;
+			case EQ:
+				*value = *value == partial_value;
+				break;
+			case NE:
+				*value = *value != partial_value;
+				break;
+			}
 		}
 	}
 }
@@ -190,13 +213,15 @@ void eval_exp2(int* value)
 	while ((op = *G_TOKEN_BUFFER) == '+' || op == '-') {
 		get_token();
 		eval_exp3(&partial_value);
-		switch (op) { /* add or subtract */
-		case '-':
-			*value = *value - partial_value;
-			break;
-		case '+':
-			*value = *value + partial_value;
-			break;
+		if (!G_SIM_MODE) {
+			switch (op) { /* add or subtract */
+			case '-':
+				*value = *value - partial_value;
+				break;
+			case '+':
+				*value = *value + partial_value;
+				break;
+			}
 		}
 	}
 }
@@ -211,18 +236,20 @@ void eval_exp3(int* value)
 	while ((op = *G_TOKEN_BUFFER) == '*' || op == '/' || op == '%') {
 		get_token();
 		eval_exp4(&partial_value);
-		switch (op) { /* mul, div, or modulus */
-		case '*':
-			*value = *value * partial_value;
-			break;
-		case '/':
-			if (partial_value == 0) sntx_err(DIV_BY_ZERO);
-			*value = (*value) / partial_value;
-			break;
-		case '%':
-			t = (*value) / partial_value;
-			*value = *value - (t * partial_value);
-			break;
+		if (!G_SIM_MODE) {
+			switch (op) { /* mul, div, or modulus */
+			case '*':
+				*value = *value * partial_value;
+				break;
+			case '/':
+				if (partial_value == 0) sntx_err(DIV_BY_ZERO);
+				*value = (*value) / partial_value;
+				break;
+			case '%':
+				t = (*value) / partial_value;
+				*value = *value - (t * partial_value);
+				break;
+			}
 		}
 	}
 }
@@ -238,7 +265,7 @@ void eval_exp4(int* value)
 		get_token();
 	}
 	eval_exp5(value);
-	if (op)
+	if (!G_SIM_MODE && op)
 		if (op == '-') *value = -(*value);
 }
 
@@ -255,7 +282,7 @@ void eval_exp5(int* value)
 		atom(value);
 }
 
-/* определяется значение числа, перемноой, элемента массива или ызова функции. */
+/* определяется значение числа, переменной, элемента массива или вызова функции. */
 void atom(int* value)
 {
 	int i;
@@ -265,34 +292,67 @@ void atom(int* value)
 
 	switch (G_CURRENT_TOKEN_TYPE) {
 	case IDENTIFIER:
+	{
+		char* pos;
+		bool is_array_atom = false;
+		my_strcpy_s(token_temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
+		pos = strchr(token_temp, '[');
+		is_array_atom = (pos != nullptr);
+
+		// В sim-режиме на первой итерации записываем oper_plan для массивов
+		if (G_SIM_MODE && first_iter && is_array_atom)
+		{
+			char* token_t = G_TOKEN_BUFFER;
+			while (*token_t != '\0')
+				oper_plan[oper_num][index_in_oper_plan++] = *token_t++;
+#ifndef NEW_M
+			oper_plan[oper_num][index_in_oper_plan++] = SETTINGS_DELIMITER_OPER_PLAN;
+#endif
+			tokens_read[oper_num]++;
+			tokens_read_length[oper_num][token_read_num++] = strlen(G_TOKEN_BUFFER);
+		}
+
 		i = internal_func(G_TOKEN_BUFFER);
 		if (i != -1) {  /* call "standard library" function */
-			*value = (*intern_func[i].p)();
+			if (!G_SIM_MODE)
+				*value = (*intern_func[i].p)();
+			else
+				(*intern_func[i].p)();
 		}
 		else if (find_func(G_TOKEN_BUFFER)) { /* call user-defined function */
 			call();
-			*value = ret_value;
+			if (!G_SIM_MODE)
+				*value = ret_value;
 		}
 		else
 		{
-			char* pos;
-			my_strcpy_s(token_temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
-			if (pos = strchr(token_temp, '['))
+			if (is_array_atom)
 				extract_array_name_index(name, size, token_temp, pos);
-			if (is_var(G_TOKEN_BUFFER))
-				*value = find_var_array(G_TOKEN_BUFFER, 0, 0);
-			else
-				*value = find_var_array(name, 1, size);
+
+			if (G_SIM_MODE) {
+				// В sim-режиме трассируем только массивы, переменные не моделируем
+				if (is_array_atom)
+					find_array(name, size);  // g_sim_mode=true → trace_handler("r")
+			}
+			else {
+				if (is_var(G_TOKEN_BUFFER))
+					*value = find_var_array(G_TOKEN_BUFFER, 0, 0);
+				else
+					*value = find_var_array(name, 1, size);
+			}
 		}
 		get_token();
 		return;
+	}
 	case NUMBER: /* is numeric constant */
-		*value = atoi(G_TOKEN_BUFFER);
+		if (!G_SIM_MODE)
+			*value = atoi(G_TOKEN_BUFFER);
 		get_token();
 		return;
 	case DELIMITER: /* see if character constant */
 		if (*G_TOKEN_BUFFER == '\'') {
-			*value = *G_PROGRAM_POINTER;
+			if (!G_SIM_MODE)
+				*value = *G_PROGRAM_POINTER;
 			G_PROGRAM_POINTER++;
 			if (*G_PROGRAM_POINTER != '\'') sntx_err(QUOTE_EXPECTED);
 			G_PROGRAM_POINTER++;
@@ -340,20 +400,28 @@ int find_array(char* name, char* index)
 
 	for (i = G_STACK_TOP_FOR_LOCAL_ARRAYS - 1; i >= G_CALL_STACK[functos - 1].arrays; i--) {
 		if (!strcmp(G_STACK_FOR_LOCAL_ARRAYS[i].array_name, name)) {
+			bool saved_sim = G_SIM_MODE;
+			G_SIM_MODE = false;
 			index_value = eval_array_index_expression(index);
-#ifdef SIMULATOR
-			cache.trace_handler((G_STACK_FOR_LOCAL_ARRAYS[i].start_address + index_value * G_STACK_FOR_LOCAL_ARRAYS[i].sizeofop), G_STACK_FOR_LOCAL_ARRAYS[i].array_name, "r", "");
-#endif
+			G_SIM_MODE = saved_sim;
+			if (G_SIM_MODE) {
+				cache.trace_handler((G_STACK_FOR_LOCAL_ARRAYS[i].start_address + index_value * G_STACK_FOR_LOCAL_ARRAYS[i].sizeofop), G_STACK_FOR_LOCAL_ARRAYS[i].array_name, "r", "");
+				return 0;
+			}
 			return read_array_value(G_STACK_FOR_LOCAL_ARRAYS[i], index_value);
 		}
 	}
 
 	for (i = 0; i < G_ARRAY_INDEX; i++) {
 		if (!strcmp(G_GLOBAL_ARRAYS_STORAGE[i].array_name, name)) {
+			bool saved_sim = G_SIM_MODE;
+			G_SIM_MODE = false;
 			index_value = eval_array_index_expression(index);
-#ifdef SIMULATOR
-			cache.trace_handler((global_arrays[i].start_address + index_value * global_arrays[i].sizeofop), global_arrays[i].array_name, "r", "");
-#endif
+			G_SIM_MODE = saved_sim;
+			if (G_SIM_MODE) {
+				cache.trace_handler((G_GLOBAL_ARRAYS_STORAGE[i].start_address + index_value * G_GLOBAL_ARRAYS_STORAGE[i].sizeofop), G_GLOBAL_ARRAYS_STORAGE[i].array_name, "r", "");
+				return 0;
+			}
 			return read_array_value(G_GLOBAL_ARRAYS_STORAGE[i], index_value);
 		}
 	}
@@ -807,22 +875,30 @@ void assign_array(char* array_name, int value, char* index)
 
 	for (i = G_STACK_TOP_FOR_LOCAL_ARRAYS - 1; i >= G_CALL_STACK[functos - 1].arrays; i--) {
 		if (!strcmp(G_STACK_FOR_LOCAL_ARRAYS[i].array_name, array_name)) {
+			bool saved_sim = G_SIM_MODE;
+			G_SIM_MODE = false;
 			index_value = eval_array_index_expression(index);
-#ifdef SIMULATOR
-			cache.trace_handler((G_STACK_FOR_LOCAL_ARRAYS[i].start_address + index_value * G_STACK_FOR_LOCAL_ARRAYS[i].sizeofop), G_STACK_FOR_LOCAL_ARRAYS[i].array_name, "w", "");
-#endif
-			write_array_value(G_STACK_FOR_LOCAL_ARRAYS[i], index_value, value);
+			G_SIM_MODE = saved_sim;
+			if (G_SIM_MODE) {
+				cache.trace_handler((G_STACK_FOR_LOCAL_ARRAYS[i].start_address + index_value * G_STACK_FOR_LOCAL_ARRAYS[i].sizeofop), G_STACK_FOR_LOCAL_ARRAYS[i].array_name, "w", "");
+			} else {
+				write_array_value(G_STACK_FOR_LOCAL_ARRAYS[i], index_value, value);
+			}
 			return;
 		}
 	}
 
 	for (i = 0; i < G_ARRAY_INDEX; i++) {
 		if (!strcmp(G_GLOBAL_ARRAYS_STORAGE[i].array_name, array_name)) {
+			bool saved_sim = G_SIM_MODE;
+			G_SIM_MODE = false;
 			index_value = eval_array_index_expression(index);
-#ifdef SIMULATOR
-			cache.trace_handler((global_arrays[i].start_address + index_value * global_arrays[i].sizeofop), global_arrays[i].array_name, "w", "");
-#endif
-			write_array_value(G_GLOBAL_ARRAYS_STORAGE[i], index_value, value);
+			G_SIM_MODE = saved_sim;
+			if (G_SIM_MODE) {
+				cache.trace_handler((G_GLOBAL_ARRAYS_STORAGE[i].start_address + index_value * G_GLOBAL_ARRAYS_STORAGE[i].sizeofop), G_GLOBAL_ARRAYS_STORAGE[i].array_name, "w", "");
+			} else {
+				write_array_value(G_GLOBAL_ARRAYS_STORAGE[i], index_value, value);
+			}
 			return;
 		}
 	}
@@ -850,4 +926,105 @@ void assign_var(char* var_name, int value)
 				return;
 			}
 	sntx_err(NOT_VAR); /* variable not found */
-} 
+}
+
+/* ===== Функции для JIT-режима (последующие итерации цикла) ===== */
+
+// Тонкая обёртка: трассирует чтение массива (для eval_exp_sim_jit)
+void find_array_sim(char* name, char* index)
+{
+	bool saved = G_SIM_MODE;
+	G_SIM_MODE = true;
+	find_array(name, index);
+	G_SIM_MODE = saved;
+}
+
+// Тонкая обёртка: трассирует запись массива (для eval_exp_sim_jit)
+void assign_array_sim(char* array_name, char* index)
+{
+	bool saved = G_SIM_MODE;
+	G_SIM_MODE = true;
+	assign_array(array_name, 0, index);
+	G_SIM_MODE = saved;
+}
+
+// Глобальные переменные для eval_exp_sim_jit
+static char oper_local[SETTINGS_MAX_OPERATOR_LENGTH];
+static char name_local[SETTINGS_ID_LEN + 1];
+static char size_local[SETTINGS_ID_LEN + 1];
+static char* pos_local_jit;
+static char* token_l;
+static char temp_c;
+static char token_local[SETTINGS_ID_LEN + 1];
+static int temp_i_jit;
+static int pos_int;
+
+// Быстрый прогон: воспроизводит записанный план операций
+void eval_exp_sim_jit()
+{
+#ifdef NUMBER_OPERATORS
+	G_PROGRAM_POINTER++; // буква 'o'
+	int index = std::strtol(G_PROGRAM_POINTER, &pos_local_jit, 10);
+	G_PROGRAM_POINTER = pos_local_jit;
+	G_PROGRAM_POINTER++; // символ ';'
+	while (*G_PROGRAM_POINTER != ';')
+		G_PROGRAM_POINTER++;
+	get_token();
+#else
+	// считываем оператор
+	char* temp_oper = oper_local;
+	while (*prog != ';')
+		*temp_oper++ = *prog++;
+	*temp_oper = '\0';
+	get_token();   // считываем ;
+	// ищем в массиве
+	int index = 0;
+	while (strcmp(oper_local, oper[index])) index++;
+#endif
+	// выполняем план под номером index
+	// сначала чтения
+#ifdef NEW_M
+	token_l = oper_plan[index];
+	for (int i = 0; i < tokens_read[index]; i++) // цикл по токенам чтения
+	{
+		temp_c = token_l[tokens_read_length[index][i]];
+		token_l[tokens_read_length[index][i]] = '\0';
+		pos_local_jit = strchr(token_l, '[');
+		extract_array_name_index(name_local, size_local, token_l, pos_local_jit);
+		// Верим, считаем, что все массивы объявлены
+		find_array_sim(name_local, size_local);
+		token_l[tokens_read_length[index][i]] = temp_c;
+		token_l += tokens_read_length[index][i];
+	}
+#else
+	pos_int = 0;
+	char* token_local_ptr = NULL;
+	while (oper_plan[index][pos_int] != '=')
+	{
+		token_local_ptr = token_local;
+		while (oper_plan[index][pos_int] != DELIMITER_OPER_PLAN)
+			*token_local_ptr++ = oper_plan[index][pos_int++];
+		*token_local_ptr = '\0';
+		pos_int++;
+		pos_local_jit = strchr(token_local, '[');
+		extract_array_name_index(name_local, size_local, token_local, pos_local_jit);
+		// Верим, считаем, что все массивы объявлены
+		find_array_sim(name_local, size_local);
+	}
+#endif
+	// теперь запись
+#ifdef NEW_M
+	pos_local_jit = strchr(token_l, '[');
+	extract_array_name_index(name_local, size_local, token_l, pos_local_jit);
+	assign_array_sim(name_local, size_local);
+#else
+	pos_int++;
+	token_local_ptr = token_local;
+	while (oper_plan[index][pos_int] != '\0')
+		*token_local_ptr++ = oper_plan[index][pos_int++];
+	*token_local_ptr = '\0';
+	pos_local_jit = strchr(token_local, '[');
+	extract_array_name_index(name_local, size_local, token_local, pos_local_jit);
+	assign_array_sim(name_local, size_local);
+#endif
+}

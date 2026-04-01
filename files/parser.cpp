@@ -29,8 +29,15 @@ static int eval_array_index_expression(char* index)
 	*p_zero++ = ';';
 	*p_zero = '\0';
 
+	// Переключаемся на посимвольный парсинг для индексного выражения
+	int saved_token_pos = g_token_pos;
+	bool saved_use_source = g_use_source_directly;
+	g_use_source_directly = true;
+
 	eval_exp(&index_value, 1);
 
+	g_use_source_directly = saved_use_source;
+	g_token_pos = saved_token_pos;
 	G_PROGRAM_POINTER = prog_temp;
 	G_CURRENT_TOKEN_TYPE = token_type_temp;
 	my_strcpy_s(G_TOKEN_BUFFER, SETTINGS_ID_LEN, temp);
@@ -319,7 +326,7 @@ void atom(int* value)
 			else
 				(*intern_func[i].p)();
 		}
-		else if (find_func(G_TOKEN_BUFFER)) { /* call user-defined function */
+		else if (find_func(G_TOKEN_BUFFER) >= 0) { /* call user-defined function */
 			call();
 			if (!G_SIM_MODE)
 				*value = ret_value;
@@ -457,39 +464,40 @@ int find_var_array(char* name, int is_array, char* index)
 		return find_var(name);
 }
 
-char* find_func(char* name)
+int find_func(char* name)
 {
 	int i;
 
 	for (i = 0; i < func_index; i++)
 		if (!strcmp(name, G_FUNC_TABLE[i].func_name))
-			return G_FUNC_TABLE[i].loc;
+			return G_FUNC_TABLE[i].token_index;
 
-	return NULL;
+	return -1;
 }
 
 /* Call a function. */
 void call(void)
 {
-	char* loc, * temp;
+	int loc_idx;
+	int saved_pos;
 	int stack_top_for_locacl_vars, stack_top_for_local_arrays;
 
-	loc = find_func(G_TOKEN_BUFFER); /* find entry point of function */
-	if (loc == NULL)
+	loc_idx = find_func(G_TOKEN_BUFFER); /* find entry point of function */
+	if (loc_idx < 0)
 		sntx_err(FUNC_UNDEF); /* function not defined */
 	else {
 		stack_top_for_locacl_vars = G_STACK_TOP_FOR_LOCAL_VARS;  /* save local var stack index */
 		stack_top_for_local_arrays = G_STACK_TOP_FOR_LOCAL_ARRAYS;
 		// НЕ !!! ДОБАВИЛ ПЕРЕДАЧУ ПАРАМЕТРОВ
 		get_args();  /* get function arguments */
-		temp = G_PROGRAM_POINTER; /* save return location */
+		saved_pos = g_token_pos; /* save return location */
 		func_push(stack_top_for_locacl_vars, stack_top_for_local_arrays);  /* save local var stack index */
-		G_PROGRAM_POINTER = loc;  /* reset prog to start of function */
+		g_token_pos = loc_idx;  /* reset prog to start of function */
 		ret_occurring = 0; /* P the return occurring variable */
 		get_params(); /* load the function's parameters with the values of the arguments */
 		interp_block(); /* interpret the function */
 		ret_occurring = 0; /* Clear the return occurring variable */
-		G_PROGRAM_POINTER = temp; /* reset the program pointer */
+		g_token_pos = saved_pos; /* reset the program pointer */
 		struct var_array_stack av = func_pop(); /* reset the local var stack */
 		// Освобождаем память локальных массивов текущего фрейма
 		for (int i = G_STACK_TOP_FOR_LOCAL_ARRAYS - 1; i >= av.arrays; i--) {
@@ -502,8 +510,8 @@ void call(void)
 }
 
 
-/* Get a token. */
-char get_token(void)
+/* Get a token from source text (old behavior, used for tokenization and index expressions). */
+char get_token_from_source(void)
 {
 
 	char* temp;
@@ -684,6 +692,67 @@ char get_token(void)
 	return G_CURRENT_TOKEN_TYPE;
 }
 
+/* Предварительная токенизация всего исходного текста. */
+void tokenize_source(void)
+{
+	g_token_stream.clear();
+	char* saved_prog = G_PROGRAM_POINTER;
+	G_PROGRAM_POINTER = p_buf;
+
+	while (true) {
+		char* pos_before = G_PROGRAM_POINTER;
+		get_token_from_source();
+
+		TokenInfo tok;
+		tok.token_type = G_CURRENT_TOKEN_TYPE;
+		tok.token = G_CURRENT_TOKEN;
+		my_strcpy_s(tok.text, SETTINGS_MAX_TOKEN_LENGTH, G_TOKEN_BUFFER);
+		tok.source_pos = G_PROGRAM_POINTER; // позиция ПОСЛЕ токена
+		tok.jit_op_index = -1;
+
+		g_token_stream.push_back(tok);
+
+		if (G_CURRENT_TOKEN == FINISHED) break;
+	}
+
+	G_PROGRAM_POINTER = saved_prog;
+}
+
+/* Получить следующий токен из предварительно токенизированного потока. */
+char get_token(void)
+{
+	// Для eval_array_index_expression: парсим из source напрямую
+	if (g_use_source_directly) {
+		return get_token_from_source();
+	}
+
+	if (g_token_pos >= (int)g_token_stream.size()) {
+		G_TOKEN_BUFFER[0] = '\0';
+		G_CURRENT_TOKEN = FINISHED;
+		G_CURRENT_TOKEN_TYPE = DELIMITER;
+		return G_CURRENT_TOKEN_TYPE;
+	}
+
+	const TokenInfo& t = g_token_stream[g_token_pos++];
+	my_strcpy_s(G_TOKEN_BUFFER, SETTINGS_MAX_TOKEN_LENGTH, t.text);
+	G_CURRENT_TOKEN_TYPE = t.token_type;
+	G_CURRENT_TOKEN = t.token;
+	G_PROGRAM_POINTER = t.source_pos; // для sntx_err
+	return G_CURRENT_TOKEN_TYPE;
+}
+
+/* Вернуть токен в поток. */
+void putback(void)
+{
+	if (g_use_source_directly) {
+		// Старое поведение: посимвольный откат
+		char* t = G_TOKEN_BUFFER;
+		for (; *t; t++) G_PROGRAM_POINTER--;
+		return;
+	}
+	if (g_token_pos > 0) g_token_pos--;
+}
+
 /* Look up a token's internal representation in the
    token table.
 */
@@ -798,15 +867,6 @@ void sntx_err(int error)
 	for (i = 0; i < 30 && p <= temp; i++, p++) printf("%c", *p);
 
 	throw SyntaxError(error);
-}
-
-/* Return a token to input stream. */  // возвращаем указатель по G_PROGRAM_POINTER в начало последнего распаршенного токена
-void putback(void)
-{
-	char* t;
-
-	t = G_TOKEN_BUFFER;
-	for (; *t; t++) G_PROGRAM_POINTER--;
 }
 
 void extract_array_name_index(const char* name, const char* size, const char* token, char* pos)
@@ -960,27 +1020,15 @@ static int temp_i_jit;
 static int pos_int;
 
 // Быстрый прогон: воспроизводит записанный план операций
-void eval_exp_sim_jit()
+void eval_exp_sim_jit(int op_index)
 {
-#ifdef NUMBER_OPERATORS
-	G_PROGRAM_POINTER++; // буква 'o'
-	int index = std::strtol(G_PROGRAM_POINTER, &pos_local_jit, 10);
-	G_PROGRAM_POINTER = pos_local_jit;
-	G_PROGRAM_POINTER++; // символ ';'
-	while (*G_PROGRAM_POINTER != ';')
-		G_PROGRAM_POINTER++;
-	get_token();
-#else
-	// считываем оператор
-	char* temp_oper = oper_local;
-	while (*prog != ';')
-		*temp_oper++ = *prog++;
-	*temp_oper = '\0';
-	get_token();   // считываем ;
-	// ищем в массиве
-	int index = 0;
-	while (strcmp(oper_local, oper[index])) index++;
-#endif
+	// Пропускаем токены оператора до ';' (токены не модифицированы)
+	do {
+		get_token();
+	} while (*G_TOKEN_BUFFER != ';');
+	// ';' прочитан (как в старом NUMBER_OPERATORS — НЕ делаем putback)
+
+	int index = op_index;
 	// выполняем план под номером index
 	// сначала чтения
 #ifdef NEW_M

@@ -74,6 +74,11 @@ char* operator_start = nullptr;
 
 int first_iter = 1;
 
+// Токенизированный поток
+std::vector<TokenInfo> g_token_stream;
+int g_token_pos = 0;
+bool g_use_source_directly = false;
+
 //std::map<std::string, std::uint32_t> arrays;
 //std::map<std::string, std::uint32_t> vars;
 std::map<std::string, int> var_values;
@@ -99,6 +104,11 @@ int entry_interp(int argc, char* argv[])
 		//
 		/* set program pointer to start of program buffer */
 		G_PROGRAM_POINTER = p_buf;
+
+		/* Предварительная токенизация всего исходного текста */
+		tokenize_source();
+		g_token_pos = 0;
+
 		prescan(); /* find the location of all functions
 					  and global variables in the program */
 
@@ -113,14 +123,14 @@ int entry_interp(int argc, char* argv[])
 		break_occurring = 0; /* initialize the break occurring flag */
 
 		/* setup call to main() */
-		G_PROGRAM_POINTER = find_func((char *)"main"); /* find program starting point */
+		int main_idx = find_func((char *)"main"); /* find program starting point */
 
-		if (!G_PROGRAM_POINTER) { /* incorrect or missing main() function in program */
+		if (main_idx < 0) { /* incorrect or missing main() function in program */
 			printf("main() not found.\n");
 			exit(1);
 		}
 
-		G_PROGRAM_POINTER--; /* back up to opening ( */
+		g_token_pos = main_idx - 1; /* back up to opening ( */
 		
 		my_strcpy_s(G_TOKEN_BUFFER, 80, "main");
 
@@ -161,20 +171,21 @@ void interp_block(void)
 		/* see what kind of token is up */
 		if (G_CURRENT_TOKEN_TYPE == IDENTIFIER) {
 			bool use_fast_sim_statement = false;
+			int stmt_token_idx = g_token_pos - 1; /* индекс токена-идентификатора */
 			in_operator = 1;
 			if (in_cycle) {
-				char name_local[SETTINGS_ID_LEN + 1] = { 0 };
-				char size_local[SETTINGS_ID_LEN + 1] = { 0 };
-				char token_temp[SETTINGS_ID_LEN + 1] = { 0 };
-				my_strcpy_s(token_temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
-
-#ifdef NUMBER_OPERATORS
-				if (token_temp[0] == 'o' && isdigit((unsigned char)token_temp[1])) {
+#ifdef FAST_SIMULATOR
+				/* На повторных итерациях: проверяем, помечен ли токен как JIT */
+				if (!first_iter && g_token_stream[stmt_token_idx].jit_op_index >= 0) {
 					use_fast_sim_statement = true;
 				}
 				else
 #endif
 				{
+					char name_local[SETTINGS_ID_LEN + 1] = { 0 };
+					char size_local[SETTINGS_ID_LEN + 1] = { 0 };
+					char token_temp[SETTINGS_ID_LEN + 1] = { 0 };
+					my_strcpy_s(token_temp, SETTINGS_ID_LEN, G_TOKEN_BUFFER);
 					char* pos_local = strchr(token_temp, '[');
 					if (pos_local != nullptr) {
 						extract_array_name_index(name_local, size_local, token_temp, pos_local);
@@ -189,46 +200,29 @@ void interp_block(void)
 			// !!!!!!!!!!!!!!!!!
 			// ЗДЕСЬ ДЛЯ УСКОРЕНИЯ  МОДЕЛИРВОАНИЯ НЕОБХОДИМО СДЕЛАТЬ ДРУГОЙ СТЕК eval_exp
 			// !!!!!!!!!!!!!!!!!
-#ifdef FAST_SIMULATOR		// ПОКА "быстрая" СИМУЛЯЦИЯ только в это мрежиме
-							// значит только циклы
-			if (in_cycle && first_iter)
-			{
-#endif
 #ifdef FAST_SIMULATOR
-				in_operator = 1;
-				if (use_fast_sim_statement && not_rekurs_eval_exp0_sim && first_iter)
-				{
-#ifdef NUMBER_OPERATORS
-					//get_token();
-					operator_start = G_PROGRAM_POINTER;
-					//putback();
-#else
-				
-					// Нужно прочитать оператор целиком				
-					//putback();
-					char* temp = prog;
-					char* temp_oper = oper[oper_num];
-					while (*temp != ';')
-						*temp_oper++ = *temp++;
-					*temp_oper = '\0';
-					//printf("%s\n", oper);
-					//get_token();				
-#endif
-				}
-#ifdef FAST_SIMULATOR		// ПОКА "быстрая" СИМУЛЯЦИЯ только в это мрежиме
-							// значит только циклы
-			}
-#endif
 			if (use_fast_sim_statement)
 			{
 				if (first_iter)
 				{
+					in_operator = 1;
 					G_SIM_MODE = true;
 					eval_exp(&value, 1);
 					G_SIM_MODE = false;
 				}
 				else
-					eval_exp_sim_jit();
+				{
+					int op_idx = g_token_stream[stmt_token_idx].jit_op_index;
+					if (op_idx >= 0) {
+						eval_exp_sim_jit(op_idx);
+					} else {
+						// Оператор в условной ветке, не пройденной на первой итерации —
+						// JIT-план не записан, трассируем через sim-mode eval_exp
+						G_SIM_MODE = true;
+						eval_exp(&value, 1);
+						G_SIM_MODE = false;
+					}
+				}
 			}
 			else
 				eval_exp(&value, 1);
@@ -236,26 +230,16 @@ void interp_block(void)
 			eval_exp(&value, 1);  /* process the expression */
 #endif
 			if (*G_TOKEN_BUFFER != ';') sntx_err(SEMI_EXPECTED);
-#ifdef FAST_SIMULATOR		// ПОКА "быстрая" СИМУЛЯЦИЯ только в это мрежиме
-							// значит только циклы
+#ifdef FAST_SIMULATOR
 			if (in_cycle && first_iter)
 			{
-#endif
-#ifdef FAST_SIMULATOR
 				in_operator = 0;
 				if (use_fast_sim_statement) {
-#ifdef NUMBER_OPERATORS
-					// ???????????????? ????????????????
-					* operator_start++ = 'o';
-					 snprintf(operator_start, 10, "%d; ", oper_num);
-					//_itoa(oper_num, operator_start, 10);
-#endif
+					/* Помечаем токен для JIT вместо модификации source */
+					g_token_stream[stmt_token_idx].jit_op_index = oper_num;
 					oper_num++;
 					index_in_oper_plan = 0;
 				}
-#endif
-#ifdef FAST_SIMULATOR		// ПОКА "быстрая" СИМУЛЯЦИЯ только в это мрежиме
-							// значит только циклы	
 			}
 #endif
 		}
@@ -361,14 +345,15 @@ int load_program(char* p, char* fname)
    and store global variables. */
 void prescan(void)
 {
-	char* prog_pointer_buffer, * tp;
+	int saved_pos;
+	int tp_idx;
 	char temp_identifier_name[SETTINGS_ID_LEN + 1]; // temp storage for var name
 	int remember_current_token;
 	int opened_brace_counter = 0;  /* When 0, this var tells us that
 					   current source position is outside
 					   of any function. */
 
-	prog_pointer_buffer = G_PROGRAM_POINTER;
+	saved_pos = g_token_pos;
 	func_index = 0;
 	do {
 		while (opened_brace_counter) {  /* bypass code inside functions */
@@ -377,7 +362,7 @@ void prescan(void)
 			if (*G_TOKEN_BUFFER == '}') opened_brace_counter--;
 		}
 
-		tp = G_PROGRAM_POINTER; /* save current position */
+		tp_idx = g_token_pos; /* save current position */
 		get_token();
 		/* global var type or function return type */
 		if (G_CURRENT_TOKEN == CHAR || G_CURRENT_TOKEN == INT) {
@@ -387,18 +372,18 @@ void prescan(void)
 				my_strcpy_s(temp_identifier_name, SETTINGS_ID_LEN + 1, G_TOKEN_BUFFER);
 				get_token();
 				if (*G_TOKEN_BUFFER != '(') { /* must be global var */
-					G_PROGRAM_POINTER = tp; /* return to start of declaration */
+					g_token_pos = tp_idx; /* return to start of declaration */
 					decl_global();
 				}
 				else if (*G_TOKEN_BUFFER == '(') {  /* must be a function */
 					if (func_index >= SETTINGS_NUM_FUNC)
 						sntx_err(TOO_MANY_FUNCS);
-					G_FUNC_TABLE[func_index].loc = G_PROGRAM_POINTER;
+					G_FUNC_TABLE[func_index].token_index = g_token_pos;
 					G_FUNC_TABLE[func_index].ret_type = remember_current_token;
 					my_strcpy_s(G_FUNC_TABLE[func_index].func_name, SETTINGS_ID_LEN, temp_identifier_name);
 					func_index++;
-					while (*G_PROGRAM_POINTER != ')') G_PROGRAM_POINTER++;
-					G_PROGRAM_POINTER++;
+					/* skip tokens to ')' */
+					while (*G_TOKEN_BUFFER != ')') get_token();
 					/* now prog points to opening curly
 					   brace of function */
 				}
@@ -407,7 +392,7 @@ void prescan(void)
 		}
 		else if (*G_TOKEN_BUFFER == '{') opened_brace_counter++;
 	} while (G_CURRENT_TOKEN != FINISHED);
-	G_PROGRAM_POINTER = prog_pointer_buffer;
+	g_token_pos = saved_pos;
 }
 
 /* Return the entry point of the specified function.
@@ -708,11 +693,11 @@ void exec_if(void)
 void exec_while(void)
 {
 	int cond;
-	char* temp;
+	int saved_pos;
 
 	break_occurring = 0; /* clear the break flag */
 	putback();
-	temp = G_PROGRAM_POINTER;  /* save location of top of while loop */
+	saved_pos = g_token_pos;  /* save location of top of while loop */
 	get_token();
 	eval_exp(&cond, 1);  /* check the conditional expression */
 	if (cond) {
@@ -726,17 +711,17 @@ void exec_while(void)
 		find_eob();
 		return;
 	}
-	G_PROGRAM_POINTER = temp;  /* loop back to top */
+	g_token_pos = saved_pos;  /* loop back to top */
 }
 
 /* Execute a do loop. */
 void exec_do(void)
 {
 	int cond;
-	char* temp;
+	int saved_pos;
 
 	putback();
-	temp = G_PROGRAM_POINTER;  /* save location of top of do loop */
+	saved_pos = g_token_pos;  /* save location of top of do loop */
 	break_occurring = 0; /* clear the break flag */
 
 	get_token(); /* get start of loop */
@@ -751,8 +736,8 @@ void exec_do(void)
 	get_token();
 	if (G_CURRENT_TOKEN != WHILE) sntx_err(WHILE_EXPECTED);
 	eval_exp(&cond, 1); /* check the loop condition */
-	if (cond) G_PROGRAM_POINTER = temp; /* if true loop; otherwise,
-							 continue on */
+	if (cond) g_token_pos = saved_pos; /* if true loop; otherwise,
+						 continue on */
 }
 
 /* Find the end of a block. */
@@ -763,15 +748,9 @@ void find_eob(void)
 	get_token();
 	brace = 1;
 	do {
-#ifdef NUMBER_OPERATORS
-		if (*G_PROGRAM_POINTER == '{') brace++;
-		else if (*G_PROGRAM_POINTER == '}') brace--;
-		G_PROGRAM_POINTER++;
-#else
 		get_token();
-		if (*token == '{') brace++;
-		else if (*token == '}') brace--;
-#endif
+		if (*G_TOKEN_BUFFER == '{') brace++;
+		else if (*G_TOKEN_BUFFER == '}') brace--;
 	} while (brace);
 }
 
@@ -779,7 +758,7 @@ void find_eob(void)
 void exec_for(void)
 {
 	int loop_condition_value;
-	char* condition_pos_pointer, * increment_pos_pointer;
+	int condition_pos, increment_pos;
 	int opened_brace_counter;
 
 	if (!in_cycle)
@@ -799,13 +778,13 @@ void exec_for(void)
 	get_token();
 	eval_exp(&loop_condition_value, 1);  /* initialization expression */
 	if (*G_TOKEN_BUFFER != ';') sntx_err(SEMI_EXPECTED);
-	G_PROGRAM_POINTER++; /* get past the ; */
-	condition_pos_pointer = G_PROGRAM_POINTER;
+	g_token_pos++; /* get past the ; */
+	condition_pos = g_token_pos;
 	for (;;) {
 		eval_exp(&loop_condition_value, 1);  /* check the condition */
 		if (*G_TOKEN_BUFFER != ';') sntx_err(SEMI_EXPECTED);
-		G_PROGRAM_POINTER++; /* get past the ; */
-		increment_pos_pointer = G_PROGRAM_POINTER;
+		g_token_pos++; /* get past the ; */
+		increment_pos = g_token_pos;
 		// НЕ !!! ДОБАВИЛ УСЛОВИЯ С МАССИВАМИ
 		/* find the start of the for block */
 		opened_brace_counter = 1;
@@ -848,8 +827,8 @@ void exec_for(void)
 			*/
 			return;
 		}
-		G_PROGRAM_POINTER = increment_pos_pointer;
+		g_token_pos = increment_pos;
 		eval_exp(&loop_condition_value, 1); /* do the increment */
-		G_PROGRAM_POINTER = condition_pos_pointer;  /* loop back to top */
+		g_token_pos = condition_pos;  /* loop back to top */
 	}
 }

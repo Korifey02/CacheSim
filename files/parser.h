@@ -17,9 +17,11 @@ void assign_var_array(char* var_name, int value, int is_array, char* array_index
 int find_array(char* name, char* index);
 int find_var(char* s);
 int find_var_array(char* name, int is_array, char* index);
-char* find_func(char* name);
+int find_func(char* name);
 void call(void);
 char get_token(void);
+char get_token_from_source(void);
+void tokenize_source(void);
 char look_up(char* s);
 int isdelim(char c);
 int iswhite(char c);
@@ -36,6 +38,6 @@ void extract_array_name_index(const char* name, const char* size, const char* to
 int is_var(char* s);
 int is_array(char*);
 
-void eval_exp_sim_jit();
+void eval_exp_sim_jit(int op_index);
 void find_array_sim(char* name, char* index);
 void assign_array_sim(char* array_name, char* index);

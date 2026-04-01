@@ -1,7 +1,8 @@
 #pragma once
 #include <stdexcept>
 #include <fstream>
-#include<map>
+#include <map>
+#include <vector>
 #include <cstdint>
 #include <stdint.h>
 
@@ -150,7 +151,16 @@ struct array_type_sim {
 struct func_type {
 	char func_name[SETTINGS_ID_LEN];
 	int ret_type;
-	char* loc;  /* location of entry point in file */
+	int token_index;  /* position in token stream */
+};
+
+// Токен для предварительно токенизированного потока
+struct TokenInfo {
+	char token_type;     // DELIMITER, IDENTIFIER, NUMBER, etc.
+	char token;          // keyword token (IF, WHILE...) or 0
+	char text[SETTINGS_MAX_TOKEN_LENGTH];
+	char* source_pos;    // position in source (for sntx_err line counting)
+	int jit_op_index;    // FAST_SIMULATOR: JIT operator plan index, -1 if not replaced
 };
 extern struct func_type G_FUNC_TABLE[];
 
@@ -197,6 +207,10 @@ extern int DEBUG_COUNTER;
 extern int total_reads;
 extern int in_cycle;
 extern std::map<std::string, int> var_values;
+
+extern std::vector<TokenInfo> g_token_stream;
+extern int g_token_pos;
+extern bool g_use_source_directly;  // for eval_array_index_expression fallback
 
 extern bool G_SIM_MODE;
 extern int not_rekurs_eval_exp0_sim;

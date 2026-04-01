@@ -1,5 +1,6 @@
 #pragma once
 int entry_interp(int argc, char* argv[]);
+void cleanup_global_arrays(void);
 void interp_block(void);
 int load_program(char* p, char* fname);
 void prescan(void);

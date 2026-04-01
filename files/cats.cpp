@@ -34,5 +34,9 @@ int main(int argc, char* argv[])
 	std::cout << "Time is " << elapsed.count() << endl<< endl;
 
 	cache.print_results();
+
+	cleanup_global_arrays();
+	free(p_buf);
+	p_buf = nullptr;
 	
 }

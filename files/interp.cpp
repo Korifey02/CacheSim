@@ -132,6 +132,15 @@ int entry_interp(int argc, char* argv[])
 	return 0;
 }
 
+/* Освобождает память, выделенную под глобальные массивы. */
+void cleanup_global_arrays(void)
+{
+	for (int i = 0; i < G_ARRAY_INDEX; i++) {
+		free(G_GLOBAL_ARRAYS_STORAGE[i].adr);
+		G_GLOBAL_ARRAYS_STORAGE[i].adr = nullptr;
+	}
+}
+
 /* Interpret a single statement or block of code. When
    interp_block() returns from its initial call, the final
    brace (or a return) in main() has been encountered.

@@ -423,6 +423,11 @@ void call(void)
 		ret_occurring = 0; /* Clear the return occurring variable */
 		G_PROGRAM_POINTER = temp; /* reset the program pointer */
 		struct var_array_stack av = func_pop(); /* reset the local var stack */
+		// Освобождаем память локальных массивов текущего фрейма
+		for (int i = G_STACK_TOP_FOR_LOCAL_ARRAYS - 1; i >= av.arrays; i--) {
+			free(G_STACK_FOR_LOCAL_ARRAYS[i].adr);
+			G_STACK_FOR_LOCAL_ARRAYS[i].adr = nullptr;
+		}
 		G_STACK_TOP_FOR_LOCAL_VARS = av.vars;
 		G_STACK_TOP_FOR_LOCAL_ARRAYS = av.arrays;
 	}
